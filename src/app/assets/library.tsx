@@ -1,0 +1,153 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { ArrowUpRight, BadgeCheck, FolderOpen } from "lucide-react";
+import type { AssetPayload } from "@/lib/creative/engine";
+import { KIND_LABELS, platformById, type BrandSettings } from "@/lib/creative/presets";
+import { cx, timeAgo } from "@/lib/utils";
+import { AssetVisual } from "@/components/ad-creative";
+import { DynIcon, EmptyState, SectionHead } from "@/components/ui";
+
+type Item = {
+  id: string;
+  kind: string;
+  platform: string;
+  aspect: string;
+  title: string;
+  payload: AssetPayload;
+  score: number;
+  status: string;
+  approved: boolean;
+  createdAt: string;
+  campaignId: string;
+  campaignName: string;
+  propertyId: string;
+  propertyName: string;
+  preset: string;
+};
+
+export function AssetLibrary({
+  items,
+  brand,
+  initialProperty,
+}: {
+  items: Item[];
+  brand: BrandSettings;
+  initialProperty: string;
+}) {
+  const [platform, setPlatform] = useState("all");
+  const [kind, setKind] = useState("all");
+  const [status, setStatus] = useState("all");
+
+  const platforms = useMemo(() => ["all", ...new Set(items.filter((i) => !initialProperty || i.propertyId === initialProperty).map((i) => i.platform))], [items, initialProperty]);
+  const kinds = useMemo(() => ["all", ...new Set(items.map((i) => i.kind))], [items]);
+
+  const scoped = initialProperty ? items.filter((i) => i.propertyId === initialProperty) : items;
+
+  const filtered = scoped.filter(
+    (i) =>
+      (platform === "all" || i.platform === platform) &&
+      (kind === "all" || i.kind === kind) &&
+      (status === "all" || (status === "approved" ? i.approved : i.status === status))
+  );
+
+  const Select = ({ value, set, opts, fmt }: { value: string; set: (v: string) => void; opts: string[]; fmt: (v: string) => string }) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {opts.map((o) => (
+        <button
+          key={o}
+          onClick={() => set(o)}
+          className={cx(
+            "rounded-full border px-3 py-1.5 text-[11px] transition-all",
+            value === o ? "border-gold/60 bg-gold/10 text-gold" : "border-line text-faint hover:text-mute"
+          )}
+        >
+          {fmt(o)}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="mx-auto max-w-[1280px]">
+      <SectionHead
+        kicker="Library"
+        title={`Generated Ads · ${scoped.length}`}
+        action={
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
+            {filtered.length} shown
+          </span>
+        }
+      />
+
+      {items.length === 0 ? (
+        <EmptyState
+          icon={FolderOpen}
+          title="Nothing generated yet"
+          sub="Assets from every campaign land here — filterable by platform, format and QC status."
+          action={<Link href="/campaigns/new" className="btn-gold rounded-xl px-5 py-2.5 text-[13px] font-semibold">Generate a campaign</Link>}
+        />
+      ) : (
+        <>
+          <div className="anim-up mb-6 space-y-3 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <span className="w-16 font-mono text-[9.5px] uppercase tracking-[0.2em] text-faint">Platform</span>
+              <Select value={platform} set={setPlatform} opts={platforms} fmt={(v) => (v === "all" ? "All" : platformById(v).short)} />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="w-16 font-mono text-[9.5px] uppercase tracking-[0.2em] text-faint">Format</span>
+              <Select value={kind} set={setKind} opts={kinds} fmt={(v) => (v === "all" ? "All" : KIND_LABELS[v] ?? v)} />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="w-16 font-mono text-[9.5px] uppercase tracking-[0.2em] text-faint">Status</span>
+              <Select value={status} set={setStatus} opts={["all", "ready", "review", "improving", "approved"]} fmt={(v) => (v === "all" ? "All" : v === "ready" ? "Ready" : v === "review" ? "Review" : v === "improving" ? "Improving" : "Approved")} />
+            </div>
+          </div>
+
+          {initialProperty && scoped[0] && (
+            <div className="mb-5 font-mono text-[10px] uppercase tracking-[0.2em] text-gold">
+              Filtered: {scoped[0].propertyName}
+            </div>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filtered.map((i, idx) => (
+              <div key={i.id} className="anim-up panel panel-hover group overflow-hidden" style={{ animationDelay: `${Math.min(idx, 10) * 40}ms` }}>
+                <div className="flex items-center justify-between border-b border-line px-3 py-2">
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-faint">
+                    <span className={i.platform === "multi" ? "text-gold" : "text-mute"}>
+                      <DynIcon name={i.platform === "multi" ? "Sparkles" : platformById(i.platform).icon} size={11.5} />
+                    </span>
+                    {KIND_LABELS[i.kind] ?? i.kind}
+                  </span>
+                  <span className={cx(
+                    "flex items-center gap-1 font-mono text-[10px]",
+                    i.approved ? "text-sage" : i.score >= brand.thresholds.ready ? "text-sage" : i.score >= brand.thresholds.review ? "text-warn" : "text-rust"
+                  )}>
+                    {i.approved && <BadgeCheck size={11} />} QC {i.score}
+                  </span>
+                </div>
+                <AssetVisual asset={i} brand={brand} />
+                <div className="px-3 py-2.5">
+                  <Link href={`/campaigns/${i.campaignId}`} className="group/link flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-[11.5px] text-cream/85">{i.campaignName}</div>
+                      <div className="font-mono text-[9px] uppercase tracking-widest text-faint">{i.propertyName} · {timeAgo(i.createdAt)}</div>
+                    </div>
+                    <ArrowUpRight size={13} className="shrink-0 text-faint transition-colors group-hover/link:text-gold" />
+                  </Link>
+                </div>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="col-span-full panel px-6 py-12 text-center text-[13px] text-faint">
+                No assets match these filters.
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
