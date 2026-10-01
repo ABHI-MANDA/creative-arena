@@ -72,6 +72,10 @@ export type AssetPayload = {
   hashtags?: string[];
   variant?: number;
   exportFiles?: { png?: string; jpeg?: string };
+  /* ---- AI image pipeline fields ---- */
+  imageSource?: "ai-generated" | "uploaded" | "sample";  // origin of the background image
+  imageGenPrompt?: string;   // the exact prompt sent to the image model
+  imageQualityScore?: number; // quality score from the image generation evaluator (0-100)
 };
 
 export type QCResult = {

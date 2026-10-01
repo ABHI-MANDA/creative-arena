@@ -19,24 +19,7 @@ export type AdAssetLike = {
 
 /* ---------- brand lock-up ---------- */
 function BrandRow({ brand }: { brand: BrandSettings }) {
-  return (
-    <div className="flex items-center" style={{ gap: "1.6cqw" }}>
-      <Image
-        src="/images/brand-logo.png"
-        alt=""
-        width={128}
-        height={128}
-        style={{ width: "4.6cqw", height: "4.6cqw", minWidth: 14, minHeight: 14 }}
-        className="object-contain"
-      />
-      <span
-        className="font-mono uppercase"
-        style={{ fontSize: "2.1cqw", letterSpacing: "0.34em", color: "rgba(244,238,225,.92)" }}
-      >
-        {brand.name}
-      </span>
-    </div>
-  );
+  return null;
 }
 
 function CtaPill({ cta, wide, poster }: { cta: string; wide?: boolean; poster?: boolean }) {
@@ -84,14 +67,7 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
 
   return (
     <div className="absolute inset-0 flex flex-col" style={{ padding: "4.8cqw" }}>
-      <div className="flex items-start justify-between">
-        <BrandRow brand={brand} />
-        <span className="ad-micro font-mono uppercase" style={{ border: "1px solid rgba(244,238,225,.36)", borderRadius: 999, padding: "0.8cqw 2cqw", background: "rgba(7,15,12,.28)" }}>
-          {spec.short} · {asset.aspect}
-        </span>
-      </div>
-
-      <div className="mt-[5cqw] text-center">
+      <div className="mt-[2cqw] text-center">
         {p.kicker && <div className="ad-poster-kicker">{p.kicker}</div>}
         <h3 className="ad-poster-title">{p.headline}</h3>
         {p.subline && <p className="ad-poster-type">{p.subline}</p>}
@@ -138,17 +114,7 @@ function OverlayBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSetting
 
   return (
     <div className="absolute inset-0 flex flex-col justify-between" style={{ padding: "4.6cqw" }}>
-      <div className="flex items-start justify-between">
-        <BrandRow brand={brand} />
-        <span
-          className="ad-micro font-mono uppercase"
-          style={{ border: "1px solid rgba(244,238,225,.25)", borderRadius: 999, padding: "0.8cqw 2cqw" }}
-        >
-          {spec.short} · {asset.aspect}
-        </span>
-      </div>
-
-      <div className="flex flex-col" style={{ gap: "1.6cqw" }}>
+      <div className="flex flex-col" style={{ gap: "1.6cqw", marginTop: "1.5cqw" }}>
         {asset.kind === "offer" && (
           <span
             className="ad-chip self-start font-mono uppercase"
@@ -251,7 +217,7 @@ function OverlayBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSetting
       </div>
 
       <div className="flex items-center justify-between">
-        <span className="ad-micro">{asset.kind === "reel" ? "Made with M & A Creative Engine" : (p.subline && asset.kind !== "story" ? "" : "")}{brand.domain}</span>
+        <span className="ad-micro">{brand.domain}</span>
         {portrait && <span className="ad-micro uppercase" style={{ letterSpacing: "0.22em" }}>{asset.kind.toUpperCase()} SERIES</span>}
       </div>
     </div>
@@ -269,7 +235,6 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
         className="flex h-full flex-col justify-between"
         style={{ width: "46%", padding: "2.6cqw", background: "linear-gradient(160deg,#17140f,#100e0a)", borderRight: "1px solid rgba(217,171,94,.25)" }}
       >
-        <BrandRow brand={brand} />
         <div style={{ marginTop: "1.4cqw" }}>
           {p.kicker && <div className="adw-kicker" style={{ marginBottom: "1cqw" }}>{p.kicker}</div>}
           <h3 className="adw-h">{p.headline}</h3>
@@ -354,11 +319,6 @@ export function AdCreative({
           <ScoreRing score={asset.score} size={34} />
         </div>
       )}
-      {asset.approved && (
-        <div className="absolute left-2 top-2 z-10 rounded-full bg-ink/80 p-1 text-sage backdrop-blur">
-          <BadgeCheck size={15} />
-        </div>
-      )}
     </div>
   );
 }
@@ -380,10 +340,7 @@ export function CopyVisual({
     <div className={cx("flex flex-col justify-between bg-coal p-5", className)} style={{ aspectRatio: aspectCss(asset.aspect) }}>
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Image src="/images/brand-logo.png" alt="" width={24} height={24} className="h-6 w-6 object-contain" />
-            <span className="font-mono text-[9px] uppercase tracking-[0.28em] text-mute">{brand.name}</span>
-          </div>
+          <span className="font-mono text-[9px] uppercase tracking-[0.28em] text-mute">{brand.name}</span>
           <span className="font-mono text-[9px] uppercase tracking-widest text-faint">COPY PACK</span>
         </div>
         {captions.map((c) => (

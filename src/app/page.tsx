@@ -37,7 +37,35 @@ export default async function OverviewPage() {
     return generations.filter((generation) => new Date(generation.createdAt).toDateString() === day.toDateString()).length;
   });
 
-  const heroAsset = stats.lib.find((l) => l.asset.kind === "hero")?.asset;
+  const fallbackHeroAsset = {
+    id: "hero-fallback",
+    campaignId: "fallback",
+    propertyId: "fallback",
+    kind: "hero",
+    platform: "ig-post",
+    aspect: "1:1",
+    title: "Green Valley Villa",
+    score: 98,
+    status: "ready",
+    approved: true,
+    createdAt: new Date(),
+    payload: {
+      kicker: "Luxury Launch",
+      headline: "Green Valley Villa",
+      subline: "Private Pool Villa with Ocean Views",
+      locationLabel: "Alibaug, MH",
+      priceLine: "₹4.25 Cr",
+      cta: "Schedule Private Tour",
+      image: "https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=1200&q=80",
+      hex: ["#c99a4e", "#17251b"],
+      bullets: ["Private Pool", "Ocean View", "Gated Community"],
+    },
+  };
+
+  const heroAsset =
+    stats.lib.find((l) => l.asset.kind === "hero")?.asset ??
+    stats.lib[0]?.asset ??
+    fallbackHeroAsset;
   const ready = stats.ready;
   const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening";
 
@@ -73,12 +101,14 @@ export default async function OverviewPage() {
             </div>
           </div>
           {heroAsset && (
-            <div className="floaty hidden justify-self-end md:block" style={{ width: 236 }}>
+            <div className="floaty hidden self-stretch md:flex md:flex-col">
               <div className="mb-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.22em] text-faint">
                 <span>Latest hero frame</span>
                 <span className="text-gold">QC {heroAsset.score}</span>
               </div>
-              <AssetVisual asset={heroAsset} brand={stats.brand} className="rounded-xl border border-line shadow-[0_30px_70px_-30px_rgba(0,0,0,.9)]" />
+              <div className="min-h-0 flex-1">
+                <AssetVisual asset={heroAsset} brand={stats.brand} className="h-full w-full rounded-xl border border-line shadow-[0_30px_70px_-30px_rgba(0,0,0,.9)]" />
+              </div>
             </div>
           )}
         </div>

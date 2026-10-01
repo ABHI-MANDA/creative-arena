@@ -139,44 +139,53 @@ export async function listProperties(): Promise<PropertyCard[]> {
   }
 }
 
+async function getLocalPropertyBundle(id: string) {
+  return readLocalDatabase((database) => {
+    const property = database.properties.find((row) => row.id === id);
+    if (!property) return null;
+    const storedDNA = database.propertyDna.find((row) => row.propertyId === id)?.data;
+    return {
+      property,
+      images: database.propertyImages
+        .filter((row) => row.propertyId === id)
+        .sort((a, b) => a.sort - b.sort),
+      dna: currentPropertyDNA(property, storedDNA),
+      campaigns: database.campaigns
+        .filter((row) => row.propertyId === id)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+      assets: database.assets
+        .filter((row) => row.propertyId === id)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+    };
+  });
+}
+
 export async function getProperty(id: string) {
   if (isLocalJsonDb) {
-    return readLocalDatabase((database) => {
-      const property = database.properties.find((row) => row.id === id);
-      if (!property) return null;
-      const storedDNA = database.propertyDna.find((row) => row.propertyId === id)?.data;
-      return {
-        property,
-        images: database.propertyImages
-          .filter((row) => row.propertyId === id)
-          .sort((a, b) => a.sort - b.sort),
-        dna: currentPropertyDNA(property, storedDNA),
-        campaigns: database.campaigns
-          .filter((row) => row.propertyId === id)
-          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
-        assets: database.assets
-          .filter((row) => row.propertyId === id)
-          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
-      };
-    });
+    return getLocalPropertyBundle(id);
   }
-  const prop = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
-  if (!prop.length) return null;
-  const images = await db
-    .select()
-    .from(propertyImages)
-    .where(eq(propertyImages.propertyId, id))
-    .orderBy(propertyImages.sort);
-  const dnaRows = await db.select().from(propertyDna).where(eq(propertyDna.propertyId, id)).limit(1);
-  const camps = await db.select().from(campaigns).where(eq(campaigns.propertyId, id)).orderBy(desc(campaigns.createdAt));
-  const propAssets = await db.select().from(assets).where(eq(assets.propertyId, id)).orderBy(desc(assets.createdAt));
-  return {
-    property: prop[0],
-    images,
-    dna: currentPropertyDNA(prop[0], dnaRows[0]?.data),
-    campaigns: camps,
-    assets: propAssets,
-  };
+  try {
+    const prop = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
+    if (!prop.length) return getLocalPropertyBundle(id);
+    const images = await db
+      .select()
+      .from(propertyImages)
+      .where(eq(propertyImages.propertyId, id))
+      .orderBy(propertyImages.sort);
+    const dnaRows = await db.select().from(propertyDna).where(eq(propertyDna.propertyId, id)).limit(1);
+    const camps = await db.select().from(campaigns).where(eq(campaigns.propertyId, id)).orderBy(desc(campaigns.createdAt));
+    const propAssets = await db.select().from(assets).where(eq(assets.propertyId, id)).orderBy(desc(assets.createdAt));
+    return {
+      property: prop[0],
+      images,
+      dna: currentPropertyDNA(prop[0], dnaRows[0]?.data),
+      campaigns: camps,
+      assets: propAssets,
+    };
+  } catch (err) {
+    console.warn("PostgreSQL getProperty failed, falling back to local JSON DB:", err);
+    return getLocalPropertyBundle(id);
+  }
 }
 
 /* ---------------- campaigns ---------------- */
@@ -238,50 +247,59 @@ export async function listCampaigns(): Promise<CampaignRow[]> {
   }
 }
 
+async function getLocalCampaignBundle(id: string) {
+  return readLocalDatabase((database) => {
+    const campaign = database.campaigns.find((row) => row.id === id);
+    if (!campaign) return null;
+    const property = database.properties.find((row) => row.id === campaign.propertyId);
+    if (!property) return null;
+    const storedDNA = database.propertyDna.find((row) => row.propertyId === property.id)?.data;
+    return {
+      campaign,
+      selectedModel: database.settings.find((row) => row.key === `campaign-model:${id}`)?.value as string | undefined,
+      property,
+      images: database.propertyImages
+        .filter((row) => row.propertyId === property.id)
+        .sort((a, b) => a.sort - b.sort),
+      dna: currentPropertyDNA(property, storedDNA),
+      campaigns: database.campaigns
+        .filter((row) => row.propertyId === property.id)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+      assets: database.assets
+        .filter((row) => row.propertyId === property.id)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
+    };
+  }).then((bundle) => {
+    if (!bundle) return null;
+    return {
+      ...bundle,
+      selectedModel: bundle.selectedModel,
+      assets: bundle.assets.filter((row) => row.campaignId === id).sort((a, b) => a.kind.localeCompare(b.kind)),
+    };
+  });
+}
+
 export async function getCampaignBundle(id: string) {
   if (isLocalJsonDb) {
-    return readLocalDatabase((database) => {
-      const campaign = database.campaigns.find((row) => row.id === id);
-      if (!campaign) return null;
-      const property = database.properties.find((row) => row.id === campaign.propertyId);
-      if (!property) return null;
-      const storedDNA = database.propertyDna.find((row) => row.propertyId === property.id)?.data;
-      return {
-        campaign,
-        selectedModel: database.settings.find((row) => row.key === `campaign-model:${id}`)?.value as string | undefined,
-        property,
-        images: database.propertyImages
-          .filter((row) => row.propertyId === property.id)
-          .sort((a, b) => a.sort - b.sort),
-        dna: currentPropertyDNA(property, storedDNA),
-        campaigns: database.campaigns
-          .filter((row) => row.propertyId === property.id)
-          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
-        assets: database.assets
-          .filter((row) => row.propertyId === property.id)
-          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
-      };
-    }).then((bundle) => {
-      if (!bundle) return null;
-      return {
-        ...bundle,
-        selectedModel: bundle.selectedModel,
-        assets: bundle.assets.filter((row) => row.campaignId === id).sort((a, b) => a.kind.localeCompare(b.kind)),
-      };
-    });
+    return getLocalCampaignBundle(id);
   }
-  const camps = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
-  if (!camps.length) return null;
-  const campaign = camps[0];
-  const bundle = await getProperty(campaign.propertyId);
-  if (!bundle) return null;
-  const campAssets = await db
-    .select()
-    .from(assets)
-    .where(eq(assets.campaignId, id))
-    .orderBy(assets.kind);
-  const selectedModel = await getAppSetting<string | undefined>(`campaign-model:${id}`, undefined);
-  return { campaign, ...bundle, selectedModel, assets: campAssets };
+  try {
+    const camps = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
+    if (!camps.length) return getLocalCampaignBundle(id);
+    const campaign = camps[0];
+    const bundle = await getProperty(campaign.propertyId);
+    if (!bundle) return null;
+    const campAssets = await db
+      .select()
+      .from(assets)
+      .where(eq(assets.campaignId, id))
+      .orderBy(assets.kind);
+    const selectedModel = await getAppSetting<string | undefined>(`campaign-model:${id}`, undefined);
+    return { campaign, ...bundle, selectedModel, assets: campAssets };
+  } catch (err) {
+    console.warn("PostgreSQL getCampaignBundle failed, falling back to local JSON DB:", err);
+    return getLocalCampaignBundle(id);
+  }
 }
 
 export async function listCampaignActions(campaignId: string, limit = 12) {
@@ -293,12 +311,16 @@ export async function listCampaignActions(campaignId: string, limit = 12) {
         .slice(0, limit)
     );
   }
-  return db
-    .select()
-    .from(generations)
-    .where(eq(generations.campaignId, campaignId))
-    .orderBy(desc(generations.createdAt))
-    .limit(limit);
+  try {
+    return await db
+      .select()
+      .from(generations)
+      .where(eq(generations.campaignId, campaignId))
+      .orderBy(desc(generations.createdAt))
+      .limit(limit);
+  } catch {
+    return [];
+  }
 }
 
 export async function listRecentGenerations(limit = 7) {
@@ -309,7 +331,11 @@ export async function listRecentGenerations(limit = 7) {
         .slice(0, limit)
     );
   }
-  return db.select().from(generations).orderBy(desc(generations.createdAt)).limit(limit);
+  try {
+    return await db.select().from(generations).orderBy(desc(generations.createdAt)).limit(limit);
+  } catch {
+    return [];
+  }
 }
 
 /* ---------------- assets library ---------------- */

@@ -73,15 +73,35 @@ export default function NewPropertyPage() {
   const toggleShot = (s: ImgPick) =>
     setImages((cur) => (cur.some((i) => i.url === s.url) ? cur.filter((i) => i.url !== s.url) : [...cur, s]));
 
-  const fetchFromUrl = () => {
+  const fetchFromUrl = async () => {
     if (!url.trim()) return;
     setFetching(true);
     setFetched(false);
-    setTimeout(() => {
-      applyBlueprint(url.length % 2 === 0 ? "villa" : "tower");
-      setFetching(false);
+    setError("");
+    try {
+      const res = await fetch("/api/properties/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      const data = (await res.json()) as {
+        brief?: typeof brief;
+        images?: ImgPick[];
+        error?: string;
+      };
+      if (!res.ok || data.error || !data.brief) {
+        throw new Error(data.error ?? "Failed to extract details from webpage.");
+      }
+      setBrief(data.brief);
+      if (data.images?.length) {
+        setImages(data.images);
+      }
       setFetched(true);
-    }, 1300);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to extract webpage content.");
+    } finally {
+      setFetching(false);
+    }
   };
 
   const onFiles = async (files: FileList | null) => {

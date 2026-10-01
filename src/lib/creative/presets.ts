@@ -12,13 +12,13 @@ export type PlatformSpec = {
 
 export const PLATFORMS: PlatformSpec[] = [
   { id: "ig-reel", label: "Instagram Reel", short: "Reel", aspect: "9:16", icon: "Instagram", note: "15–30s · hook first", video: true },
-  { id: "ig-post", label: "Instagram Post", short: "Post", aspect: "4:5", icon: "Instagram", note: "4:5 feed-safe" },
+  { id: "ig-post", label: "Instagram Post", short: "Post", aspect: "1:1", icon: "Instagram", note: "1:1 feed square" },
   { id: "ig-story", label: "Instagram Story", short: "Story", aspect: "9:16", icon: "Instagram", note: "9:16 · CTA low" },
-  { id: "fb-ad", label: "Facebook Ad", short: "Facebook", aspect: "4:5", icon: "Facebook", note: "Feed placement" },
+  { id: "fb-ad", label: "Facebook Ad", short: "Facebook", aspect: "1:1", icon: "Facebook", note: "1:1 feed square" },
   { id: "yt-short", label: "YouTube Short", short: "Short", aspect: "9:16", icon: "Youtube", note: "≤ 30s · 9:16", video: true },
-  { id: "linkedin", label: "LinkedIn", short: "LinkedIn", aspect: "1.91:1", icon: "Linkedin", note: "1.91:1 · pro tone" },
+  { id: "linkedin", label: "LinkedIn", short: "LinkedIn", aspect: "1:1", icon: "Linkedin", note: "1:1 square" },
   { id: "whatsapp", label: "WhatsApp", short: "WhatsApp", aspect: "1:1", icon: "MessageCircle", note: "1:1 · broadcast" },
-  { id: "portal", label: "Property Portal", short: "Portal", aspect: "16:9", icon: "Globe", note: "16:9 banner" },
+  { id: "portal", label: "Property Portal", short: "Portal", aspect: "1:1", icon: "Globe", note: "1:1 square" },
 ];
 
 export const platformById = (id: string): PlatformSpec =>

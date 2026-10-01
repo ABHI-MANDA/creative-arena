@@ -2,15 +2,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 export const isLocalJsonDb =
-  process.env.NODE_ENV !== "production" && process.env.LOCAL_JSON_DB === "true";
+  process.env.LOCAL_JSON_DB === "true" || !process.env.DATABASE_URL?.trim();
 
 const databaseUrl =
-  process.env.DATABASE_URL ??
-  (isLocalJsonDb ? "postgresql://unused:unused@127.0.0.1:1/local_json_mode" : undefined);
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
-}
+  process.env.DATABASE_URL?.trim() || "postgresql://unused:unused@127.0.0.1:1/local_json_mode";
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
@@ -20,6 +15,12 @@ export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
     connectionString: databaseUrl,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    ssl: databaseUrl.includes("neon.tech") || databaseUrl.includes("sslmode=")
+      ? { rejectUnauthorized: false }
+      : undefined,
   });
 
 if (process.env.NODE_ENV !== "production") {
