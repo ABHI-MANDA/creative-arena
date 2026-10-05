@@ -1,0 +1,7 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # Tell Netlify secrets scanner to ignore non-secret public model identifiers and API base URLs
+  SECRETS_SCAN_OMIT_KEYS = "IMAGE_API_BASE_URL,IMAGE_MODEL,OPENROUTER_MODEL"
