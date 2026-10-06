@@ -111,3 +111,4 @@ Uploads your local commits from branch 'main' to GitHub.
 Note: If prompted in terminal or browser, authenticate with your GitHub credentials
 or a GitHub Personal Access Token (PAT).
 ================================================================================
+
