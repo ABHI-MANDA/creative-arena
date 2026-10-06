@@ -98,7 +98,18 @@ Displays the fetch and push URLs for all configured remote repositories to confi
 they point to the correct GitHub URL.
 
 
-10. PUSH CHANGES TO GITHUB
+10. ADD WEBSITE ICON & COMMIT
+--------------------------------------------------------------------------------
+Command:
+git add src/app/layout.tsx public/favicon.ico src/app/icon.png
+git commit -m "feat: add brand logo as website favicon and app icon"
+
+Description:
+Adds the brand logo as the official browser tab icon (favicon) through Next.js
+app router metadata, /icon.png route, and public/favicon.ico fallback.
+
+
+11. PUSH CHANGES TO GITHUB
 --------------------------------------------------------------------------------
 Command:
 git push -u origin main
@@ -111,4 +122,5 @@ Uploads your local commits from branch 'main' to GitHub.
 Note: If prompted in terminal or browser, authenticate with your GitHub credentials
 or a GitHub Personal Access Token (PAT).
 ================================================================================
+
 

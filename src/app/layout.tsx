@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   title: "M & A — AI Real Estate Creative Studio",
   description:
     "Turn property photos, project websites and briefs into professional, ready-to-publish real-estate campaigns.",
+  icons: {
+    icon: "/images/brand-logo.png",
+    shortcut: "/images/brand-logo.png",
+    apple: "/images/brand-logo.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
