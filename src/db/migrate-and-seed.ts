@@ -2,14 +2,22 @@ import "dotenv/config";
 import { Pool } from "pg";
 import { ensureSeed } from "./seed";
 
-const databaseUrl = process.env.DATABASE_URL;
+const rawDbUrl = process.env.DATABASE_URL?.trim();
 
-if (!databaseUrl) {
+if (!rawDbUrl) {
   console.error("DATABASE_URL is missing in environment.");
   process.exit(1);
 }
 
-const pool = new Pool({ connectionString: databaseUrl });
+const databaseUrl =
+  /[?&]sslmode=(require|prefer|verify-ca)(&|$)/i.test(rawDbUrl) && !rawDbUrl.includes("uselibpqcompat=")
+    ? `${rawDbUrl}${rawDbUrl.includes("?") ? "&" : "?"}uselibpqcompat=true`
+    : rawDbUrl;
+
+const pool = new Pool({
+  connectionString: databaseUrl,
+  ssl: { rejectUnauthorized: false },
+});
 
 async function initDb() {
   console.log("Connecting to Neon PostgreSQL...");

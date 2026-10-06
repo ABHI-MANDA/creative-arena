@@ -2,10 +2,19 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 export const isLocalJsonDb =
-  process.env.LOCAL_JSON_DB === "true" || !process.env.DATABASE_URL?.trim();
+  process.env.LOCAL_JSON_DB?.trim() === "true" || !process.env.DATABASE_URL?.trim();
 
-const databaseUrl =
-  process.env.DATABASE_URL?.trim() || "postgresql://unused:unused@127.0.0.1:1/local_json_mode";
+function normalizeDatabaseUrl(url?: string): string {
+  const trimmed = url?.trim();
+  if (!trimmed) return "postgresql://unused:unused@127.0.0.1:1/local_json_mode";
+  if (/[?&]sslmode=(require|prefer|verify-ca)(&|$)/i.test(trimmed) && !trimmed.includes("uselibpqcompat=")) {
+    const sep = trimmed.includes("?") ? "&" : "?";
+    return `${trimmed}${sep}uselibpqcompat=true`;
+  }
+  return trimmed;
+}
+
+const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;

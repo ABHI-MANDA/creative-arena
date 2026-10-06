@@ -85,6 +85,27 @@ function safeClear(canvas: fabric.Canvas | null) {
   }
 }
 
+function formatColorValue(val: unknown): string {
+  if (typeof val === "string") return val;
+  if (val && typeof val === "object") {
+    if ("colorStops" in val || ("type" in val && ((val as { type: string }).type === "linear" || (val as { type: string }).type === "radial"))) {
+      return "Gradient";
+    }
+    return "Custom Fill";
+  }
+  return "";
+}
+
+function toHexColor(val: unknown, fallback: string = "#d9ab5e"): string {
+  if (typeof val === "string") {
+    if (/^#[0-9a-f]{6}$/i.test(val)) return val;
+    if (/^#[0-9a-f]{3}$/i.test(val)) {
+      return `#${val[1]}${val[1]}${val[2]}${val[2]}${val[3]}${val[3]}`;
+    }
+  }
+  return fallback;
+}
+
 export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Props) {
   const assetRef = useRef(asset);
   assetRef.current = asset;
@@ -296,24 +317,26 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
       const active = canvas.getActiveObject();
       setSelectedObject(active ?? null);
 
-      if (active && active instanceof fabric.Textbox) {
+      if (active && (active instanceof fabric.Textbox || active instanceof fabric.IText || active instanceof fabric.Text)) {
+        const fillVal = typeof active.fill === "string" ? active.fill : formatColorValue(active.fill);
         setTextProps({
-          text: active.text || "",
-          fontFamily: active.fontFamily || "Inter, sans-serif",
-          fontSize: active.fontSize || 32,
+          text: (active as fabric.Textbox).text || "",
+          fontFamily: (active as fabric.Textbox).fontFamily || "Inter, sans-serif",
+          fontSize: (active as fabric.Textbox).fontSize || 32,
           fontWeight: String(active.fontWeight || "normal"),
-          fontStyle: active.fontStyle || "normal",
-          underline: Boolean(active.underline),
-          fill: (active.fill as string) || "#ffffff",
-          textAlign: active.textAlign || "left",
-          charSpacing: active.charSpacing || 0,
-          lineHeight: active.lineHeight || 1.2,
+          fontStyle: (active as fabric.Textbox).fontStyle || "normal",
+          underline: Boolean((active as fabric.Textbox).underline),
+          fill: fillVal || "#ffffff",
+          textAlign: (active as fabric.Textbox).textAlign || "left",
+          charSpacing: (active as fabric.Textbox).charSpacing || 0,
+          lineHeight: (active as fabric.Textbox).lineHeight || 1.2,
           opacity: active.opacity ?? 1,
         });
       } else if (active && (active instanceof fabric.Rect || active instanceof fabric.Circle)) {
+        const fillVal = typeof active.fill === "string" ? active.fill : formatColorValue(active.fill);
         setShapeProps({
-          fill: (active.fill as string) || "#d9ab5e",
-          stroke: (active.stroke as string) || "",
+          fill: fillVal || "#d9ab5e",
+          stroke: typeof active.stroke === "string" ? active.stroke : "",
           strokeWidth: active.strokeWidth || 0,
           rx: (active as fabric.Rect).rx || 0,
           ry: (active as fabric.Rect).ry || 0,
@@ -735,7 +758,8 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
     if (active) {
       (active as unknown as { set: (k: string, v: unknown) => void }).set(key, value);
       canvas.renderAll();
-      setShapeProps((prev) => ({ ...prev, [key]: value }));
+      const safeVal = (key === "fill" || key === "stroke") ? (typeof value === "string" ? value : formatColorValue(value)) : value;
+      setShapeProps((prev) => ({ ...prev, [key]: safeVal }));
       pushHistory();
     }
   };
@@ -1336,7 +1360,7 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
                         )}
                       >
                         <span className="truncate max-w-[140px] font-medium">
-                          {meta?.name || obj.type}
+                          {meta?.name ? String(meta.name) : String(obj.type || "Layer")}
                         </span>
                         <div className="flex items-center gap-1">
                           <button
@@ -1391,7 +1415,7 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
           <aside className="w-80 shrink-0 border-l border-line bg-panel/70 p-5 overflow-y-auto space-y-6">
             <div className="flex items-center justify-between border-b border-line pb-3">
               <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">
-                {activeMeta?.name || "Object Properties"}
+                {activeMeta?.name ? String(activeMeta.name) : "Object Properties"}
               </h3>
               <button onClick={() => deleteObject()} className="text-faint hover:text-rust" title="Delete Object">
                 <Trash2 size={15} />
@@ -1464,11 +1488,11 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
-                        value={textProps.fill}
+                        value={toHexColor(textProps.fill, "#ffffff")}
                         onChange={(e) => updateSelectedText("fill", e.target.value)}
                         className="h-8 w-8 cursor-pointer rounded border-none bg-transparent"
                       />
-                      <span className="font-mono text-[11px] text-mute">{textProps.fill}</span>
+                      <span className="font-mono text-[11px] text-mute">{formatColorValue(textProps.fill)}</span>
                     </div>
                   </div>
                 </div>
@@ -1504,11 +1528,11 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={shapeProps.fill}
+                      value={toHexColor(shapeProps.fill, "#d9ab5e")}
                       onChange={(e) => updateSelectedShape("fill", e.target.value)}
                       className="h-8 w-8 cursor-pointer rounded border-none bg-transparent"
                     />
-                    <span className="font-mono text-[11px] text-mute">{shapeProps.fill}</span>
+                    <span className="font-mono text-[11px] text-mute">{formatColorValue(shapeProps.fill)}</span>
                   </div>
                 </div>
 

@@ -23,6 +23,7 @@ function BrandRow({ brand }: { brand: BrandSettings }) {
 }
 
 function CtaPill({ cta, wide, poster }: { cta: string; wide?: boolean; poster?: boolean }) {
+  if (typeof cta !== "string" && typeof cta !== "number") return null;
   return (
     <span
       className="inline-flex items-center font-sans"
@@ -35,13 +36,14 @@ function CtaPill({ cta, wide, poster }: { cta: string; wide?: boolean; poster?: 
         boxShadow: poster ? "0 1cqw 3cqw rgba(0,0,0,.32)" : "0 0.8cqw 2.4cqw rgba(0,0,0,.35)",
       }}
     >
-      <span className={wide ? "adw-cta" : "ad-cta"}>{cta}</span>
+      <span className={wide ? "adw-cta" : "ad-cta"}>{String(cta)}</span>
       <ArrowUpRight style={{ width: wide ? "2cqw" : "3cqw", height: wide ? "2cqw" : "3cqw", minWidth: 8, minHeight: 8 }} />
     </span>
   );
 }
 
 function PriceGhost({ price, wide }: { price: string; wide?: boolean }) {
+  if (typeof price !== "string" && typeof price !== "number") return null;
   return (
     <span
       style={{
@@ -54,10 +56,15 @@ function PriceGhost({ price, wide }: { price: string; wide?: boolean }) {
       }}
     >
       <span className={wide ? "adw-price" : "ad-price"} style={{ fontSize: wide ? "2.2cqw" : "3.4cqw" }}>
-        {price}
+        {String(price)}
       </span>
     </span>
   );
+}
+
+function safeText(val: unknown): string {
+  if (typeof val === "string" || typeof val === "number") return String(val);
+  return "";
 }
 
 function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }) {
@@ -68,27 +75,27 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
   return (
     <div className="absolute inset-0 flex flex-col" style={{ padding: "4.8cqw" }}>
       <div className="mt-[2cqw] text-center">
-        {p.kicker && <div className="ad-poster-kicker">{p.kicker}</div>}
-        <h3 className="ad-poster-title">{p.headline}</h3>
-        {p.subline && <p className="ad-poster-type">{p.subline}</p>}
-        {p.fine && <p className="ad-poster-tagline">{p.fine}</p>}
+        {p.kicker && <div className="ad-poster-kicker">{safeText(p.kicker)}</div>}
+        <h3 className="ad-poster-title">{safeText(p.headline)}</h3>
+        {p.subline && <p className="ad-poster-type">{safeText(p.subline)}</p>}
+        {p.fine && <p className="ad-poster-tagline">{safeText(p.fine)}</p>}
       </div>
 
       <div className="mt-auto">
         {bullets.length > 0 && (
           <div className="ad-poster-benefits">
-            {bullets.map((bullet) => <span key={bullet}>{bullet}</span>)}
+            {bullets.map((bullet, idx) => (typeof bullet === "string" ? <span key={idx}>{bullet}</span> : null))}
           </div>
         )}
         <div className="ad-poster-details">
-          {p.locationLabel && (
+          {p.locationLabel && typeof p.locationLabel === "string" && (
             <div className="ad-poster-location">
               <MapPin style={{ width: "3.1cqw", height: "3.1cqw", minWidth: 11, minHeight: 11 }} />
               <span>{p.locationLabel}</span>
             </div>
           )}
           <div className="flex flex-wrap items-center justify-between" style={{ gap: "2cqw", marginTop: "2.2cqw" }}>
-            {p.priceLine && <span className="ad-poster-price">{p.priceLine}</span>}
+            {p.priceLine && typeof p.priceLine === "string" && <span className="ad-poster-price">{p.priceLine}</span>}
             {p.cta && <CtaPill cta={p.cta} poster />}
           </div>
         </div>
@@ -115,7 +122,7 @@ function OverlayBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSetting
   return (
     <div className="absolute inset-0 flex flex-col justify-between" style={{ padding: "4.6cqw" }}>
       <div className="flex flex-col" style={{ gap: "1.6cqw", marginTop: "1.5cqw" }}>
-        {asset.kind === "offer" && (
+        {asset.kind === "offer" && p.kicker && (
           <span
             className="ad-chip self-start font-mono uppercase"
             style={{
@@ -126,43 +133,45 @@ function OverlayBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSetting
               letterSpacing: "0.24em",
             }}
           >
-            {p.kicker}
+            {safeText(p.kicker)}
           </span>
         )}
-        {asset.kind !== "offer" && p.kicker && <span className="ad-kicker">{p.kicker}</span>}
+        {asset.kind !== "offer" && p.kicker && <span className="ad-kicker">{safeText(p.kicker)}</span>}
 
         {asset.kind === "lifestyle" || asset.kind === "reel" ? (
-          <h3 className="ad-h-ital">{asset.kind === "reel" ? p.hook : p.headline}</h3>
+          <h3 className="ad-h-ital">{safeText(asset.kind === "reel" ? p.hook : p.headline)}</h3>
         ) : (
           <h3 className="ad-h" style={asset.kind === "offer" ? { fontSize: "6.4cqw" } : undefined}>
-            {p.headline}
+            {safeText(p.headline)}
           </h3>
         )}
 
         {asset.kind === "hero" || asset.kind === "story" ? (
-          <p className="ad-sub" style={{ maxWidth: "80%" }}>{p.subline}</p>
+          p.subline ? <p className="ad-sub" style={{ maxWidth: "80%" }}>{safeText(p.subline)}</p> : null
         ) : null}
 
-        {asset.kind === "lifestyle" && p.subline && <p className="ad-sub" style={{ maxWidth: "86%" }}>{p.subline}</p>}
+        {asset.kind === "lifestyle" && p.subline && <p className="ad-sub" style={{ maxWidth: "86%" }}>{safeText(p.subline)}</p>}
 
         {asset.kind === "feature" && (
           <div className="grid grid-cols-2" style={{ gap: "1.4cqw", marginTop: "0.6cqw" }}>
-            {bullets.map((b) => (
-              <div
-                key={b}
-                className="ad-chip flex items-center"
-                style={{
-                  gap: "1.2cqw",
-                  border: "1px solid rgba(244,238,225,.22)",
-                  background: "rgba(11,10,8,.34)",
-                  backdropFilter: "blur(5px)",
-                  borderRadius: "1cqw",
-                  padding: "1.3cqw 1.8cqw",
-                }}
-              >
-                <span style={{ width: "0.9cqw", height: "0.9cqw", minWidth: 3, minHeight: 3, borderRadius: 999, background: "#d9ab5e" }} />
-                {b}
-              </div>
+            {bullets.map((b, idx) => (
+              typeof b === "string" ? (
+                <div
+                  key={idx}
+                  className="ad-chip flex items-center"
+                  style={{
+                    gap: "1.2cqw",
+                    border: "1px solid rgba(244,238,225,.22)",
+                    background: "rgba(11,10,8,.34)",
+                    backdropFilter: "blur(5px)",
+                    borderRadius: "1cqw",
+                    padding: "1.3cqw 1.8cqw",
+                  }}
+                >
+                  <span style={{ width: "0.9cqw", height: "0.9cqw", minWidth: 3, minHeight: 3, borderRadius: 999, background: "#d9ab5e" }} />
+                  {b}
+                </div>
+              ) : null
             ))}
           </div>
         )}
@@ -170,29 +179,31 @@ function OverlayBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSetting
         {asset.kind === "location" && (
           <div style={{ marginTop: "1cqw" }}>
             {rows.map((r, i) => (
-              <div
-                key={r.label}
-                className="ad-row flex items-center justify-between"
-                style={{
-                  borderTop: i === 0 ? "none" : "1px solid rgba(244,238,225,.16)",
-                  padding: "1.15cqw 0",
-                }}
-              >
-                <span style={{ color: "rgba(244,238,225,.92)" }}>{r.label}</span>
-                {r.mins !== undefined && (
-                  <span className="font-mono" style={{ color: "#d9ab5e", fontSize: "2.6cqw" }}>
-                    {r.mins} MIN
-                  </span>
-                )}
-              </div>
+              typeof r === "object" && r !== null && typeof r.label === "string" ? (
+                <div
+                  key={i}
+                  className="ad-row flex items-center justify-between"
+                  style={{
+                    borderTop: i === 0 ? "none" : "1px solid rgba(244,238,225,.16)",
+                    padding: "1.15cqw 0",
+                  }}
+                >
+                  <span style={{ color: "rgba(244,238,225,.92)" }}>{r.label}</span>
+                  {r.mins !== undefined && (
+                    <span className="font-mono" style={{ color: "#d9ab5e", fontSize: "2.6cqw" }}>
+                      {r.mins} MIN
+                    </span>
+                  )}
+                </div>
+              ) : null
             ))}
           </div>
         )}
 
         {asset.kind === "offer" && (
           <>
-            <div className="ad-price" style={{ color: "#ecd9ac" }}>{p.priceLine}</div>
-            {p.fine && <div className="ad-micro">{p.fine}</div>}
+            {p.priceLine && typeof p.priceLine === "string" && <div className="ad-price" style={{ color: "#ecd9ac" }}>{p.priceLine}</div>}
+            {p.fine && typeof p.fine === "string" && <div className="ad-micro">{p.fine}</div>}
           </>
         )}
 
@@ -204,7 +215,7 @@ function OverlayBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSetting
             >
               <Film style={{ width: "2.6cqw", height: "2.6cqw", minWidth: 9 }} /> {(p.shots ?? []).length}-shot storyboard
             </span>
-            <span className="ad-micro">{p.music}</span>
+            {p.music && typeof p.music === "string" && <span className="ad-micro">{p.music}</span>}
           </div>
         )}
 
@@ -236,30 +247,34 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
         style={{ width: "46%", padding: "2.6cqw", background: "linear-gradient(160deg,#17140f,#100e0a)", borderRight: "1px solid rgba(217,171,94,.25)" }}
       >
         <div style={{ marginTop: "1.4cqw" }}>
-          {p.kicker && <div className="adw-kicker" style={{ marginBottom: "1cqw" }}>{p.kicker}</div>}
-          <h3 className="adw-h">{p.headline}</h3>
-          {p.subline && <p className="adw-sub" style={{ marginTop: "1cqw" }}>{p.subline}</p>}
+          {p.kicker && <div className="adw-kicker" style={{ marginBottom: "1cqw" }}>{safeText(p.kicker)}</div>}
+          <h3 className="adw-h">{safeText(p.headline)}</h3>
+          {p.subline && <p className="adw-sub" style={{ marginTop: "1cqw" }}>{safeText(p.subline)}</p>}
           {bullets.length > 0 && (
             <div style={{ marginTop: "1.2cqw", display: "grid", gap: "0.7cqw" }}>
-              {bullets.map((b) => (
-                <div key={b} className="adw-chip flex items-center" style={{ gap: "0.8cqw", color: "rgba(244,238,225,.9)" }}>
-                  <span style={{ width: "0.6cqw", height: "0.6cqw", minWidth: 3, minHeight: 3, borderRadius: 99, background: "#d9ab5e" }} />
-                  {b}
-                </div>
+              {bullets.map((b, idx) => (
+                typeof b === "string" ? (
+                  <div key={idx} className="adw-chip flex items-center" style={{ gap: "0.8cqw", color: "rgba(244,238,225,.9)" }}>
+                    <span style={{ width: "0.6cqw", height: "0.6cqw", minWidth: 3, minHeight: 3, borderRadius: 99, background: "#d9ab5e" }} />
+                    {b}
+                  </div>
+                ) : null
               ))}
             </div>
           )}
           {rows.length > 0 && (
             <div style={{ marginTop: "1cqw" }}>
               {rows.map((r, i) => (
-                <div key={r.label} className="adw-row flex justify-between" style={{ borderTop: i ? "1px solid rgba(244,238,225,.14)" : "none", padding: "0.7cqw 0" }}>
-                  <span style={{ color: "rgba(244,238,225,.9)" }}>{r.label}</span>
-                  {r.mins !== undefined && <span className="font-mono" style={{ color: "#d9ab5e", fontSize: "1.7cqw" }}>{r.mins} MIN</span>}
-                </div>
+                typeof r === "object" && r !== null && typeof r.label === "string" ? (
+                  <div key={i} className="adw-row flex justify-between" style={{ borderTop: i ? "1px solid rgba(244,238,225,.14)" : "none", padding: "0.7cqw 0" }}>
+                    <span style={{ color: "rgba(244,238,225,.9)" }}>{r.label}</span>
+                    {r.mins !== undefined && <span className="font-mono" style={{ color: "#d9ab5e", fontSize: "1.7cqw" }}>{r.mins} MIN</span>}
+                  </div>
+                ) : null
               ))}
             </div>
           )}
-          {asset.kind === "offer" && p.priceLine && <div className="adw-price" style={{ marginTop: "1cqw", color: "#ecd9ac" }}>{p.priceLine}</div>}
+          {asset.kind === "offer" && p.priceLine && typeof p.priceLine === "string" && <div className="adw-price" style={{ marginTop: "1cqw", color: "#ecd9ac" }}>{p.priceLine}</div>}
         </div>
         <div className="flex items-center" style={{ gap: "1.4cqw" }}>
           {p.cta && <CtaPill cta={p.cta} wide />}
