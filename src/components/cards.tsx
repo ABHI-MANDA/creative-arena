@@ -3,7 +3,7 @@ import { ArrowRight, Building2, Clapperboard, FolderOpen, MapPin, PlaySquare, Sh
 import type { CampaignRow, PropertyCard as PropertyCardT } from "@/db/queries";
 import { platformById } from "@/lib/creative/presets";
 import { Chip, DynIcon, ScoreRing, StatusPill } from "./ui";
-import { timeAgo } from "@/lib/utils";
+import { LiveTimeAgo } from "./live-time";
 
 export function PropertyCard({ card }: { card: PropertyCardT }) {
   const { property: p, images, dna, campaignCount, assetCount } = card;
@@ -83,7 +83,7 @@ export function CampaignRowCard({ row }: { row: CampaignRow }) {
           <StatusPill status={c.status} />
         </div>
         <div className="mt-0.5 truncate text-[12px] text-faint">
-          {propertyName} {propertyLocation && `· ${propertyLocation}`} · updated {timeAgo(c.createdAt)}
+          {propertyName} {propertyLocation && `· ${propertyLocation}`} · updated <LiveTimeAgo date={c.createdAt} />
         </div>
         <div className="mt-1.5 flex items-center gap-2">
           <Chip tone="gold">{c.presetLabel}</Chip>

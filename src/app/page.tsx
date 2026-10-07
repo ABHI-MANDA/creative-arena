@@ -18,12 +18,21 @@ import { CampaignRowCard, PropertyCard } from "@/components/cards";
 import { SectionHead, StatCard } from "@/components/ui";
 import { AssetVisual } from "@/components/ad-creative";
 import { KIND_LABELS } from "@/lib/creative/presets";
-import { timeAgo } from "@/lib/utils";
+import { formatLocalDate, getGreetingForHour } from "@/lib/utils";
+import { HeroGreeting, LiveActivityTimestamp } from "@/components/live-time";
 
 export const dynamic = "force-dynamic";
 
-const exactTimestamp = (value: Date) =>
-  new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(value);
+function getInitialServerTime() {
+  const now = new Date();
+  // Align initial SSR fallback with IST (+5:30) so servers running in UTC don't default to morning
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(now.getTime() + istOffsetMs + now.getTimezoneOffset() * 60 * 1000);
+  return {
+    initialGreeting: getGreetingForHour(istDate.getHours()),
+    initialDate: formatLocalDate(istDate),
+  };
+}
 
 export default async function OverviewPage() {
   await ensureSeed();
@@ -67,7 +76,7 @@ export default async function OverviewPage() {
     stats.lib[0]?.asset ??
     fallbackHeroAsset;
   const ready = stats.ready;
-  const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening";
+  const { initialGreeting, initialDate } = getInitialServerTime();
 
   return (
     <div className="mx-auto max-w-[1280px]">
@@ -76,13 +85,7 @@ export default async function OverviewPage() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(700px_240px_at_20%_-10%,rgba(217,171,94,.14),transparent)]" />
         <div className="relative grid gap-8 p-7 md:grid-cols-[1.5fr_1fr] md:p-10">
           <div>
-            <div className="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.3em] text-gold">
-              <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-sage" />
-              Property-to-Ad Creative Agent · {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
-            </div>
-            <h1 className="font-display max-w-xl text-[34px] font-medium leading-[1.05] md:text-[46px]">
-              {greeting}. Property photos in, <span className="gold-text italic">ready-to-post campaigns</span> out.
-            </h1>
+            <HeroGreeting initialGreeting={initialGreeting} initialDate={initialDate} />
             <p className="mt-4 max-w-lg text-[14px] leading-relaxed text-mute">
             An AI Creative Production Agent that understands a brand, analyzes references, plans campaigns, selects the appropriate AI models, generates content, evaluates the results, and continuously improves the campaign.
             </p>
@@ -176,12 +179,7 @@ export default async function OverviewPage() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12px] capitalize text-cream/85">{g.kind} — {g.model}</div>
                   </div>
-                  <span className="shrink-0 text-right">
-                    <span className="block font-mono text-[9px] text-faint">{timeAgo(g.createdAt)}</span>
-                    <time dateTime={new Date(g.createdAt).toISOString()} className="block whitespace-nowrap font-mono text-[9px] text-mute" title={exactTimestamp(new Date(g.createdAt))}>
-                      {exactTimestamp(new Date(g.createdAt))}
-                    </time>
-                  </span>
+                  <LiveActivityTimestamp date={g.createdAt} />
                 </div>
               ))}
             </div>

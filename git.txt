@@ -109,7 +109,20 @@ Adds the brand logo as the official browser tab icon (favicon) through Next.js
 app router metadata, /icon.png route, and public/favicon.ico fallback.
 
 
-11. PUSH CHANGES TO GITHUB
+11. FIX DYNAMIC GREETING & TIMESTAMPS FOR PRODUCTION HOSTING
+--------------------------------------------------------------------------------
+Command:
+git add src/app/admin/page.tsx src/app/assets/library.tsx src/app/page.tsx src/components/cards.tsx src/components/live-time.tsx src/lib/utils.ts
+git commit -m "fix: make greeting and timestamps dynamic in production using client timezone and live ticking"
+
+Description:
+Replaces server-static UTC time calculations with client-adaptive dynamic components
+(HeroGreeting, LiveTimeAgo, LiveExactTime, LiveActivityTimestamp). Resolves the issue
+where production cloud servers running in UTC timezone always served 'Good morning' and
+stale UTC timestamps.
+
+
+12. PUSH CHANGES TO GITHUB
 --------------------------------------------------------------------------------
 Command:
 git push -u origin main
@@ -122,5 +135,6 @@ Uploads your local commits from branch 'main' to GitHub.
 Note: If prompted in terminal or browser, authenticate with your GitHub credentials
 or a GitHub Personal Access Token (PAT).
 ================================================================================
+
 
 

@@ -16,8 +16,9 @@ import {
 import { ensureSeed } from "@/db/seed";
 import { adminStats } from "@/db/queries";
 import { hx } from "@/lib/creative/engine";
-import { money, timeAgo } from "@/lib/utils";
+import { money } from "@/lib/utils";
 import { EmptyState, SectionHead, StatusPill } from "@/components/ui";
+import { LiveTimeAgo } from "@/components/live-time";
 import { AdminReport } from "./admin-report";
 
 export const dynamic = "force-dynamic";
@@ -209,7 +210,7 @@ export default async function AdminPage() {
               </span>
               <span className="hidden font-mono text-[11px] text-faint md:block">{money(g.costCents)}</span>
               <StatusPill status={g.status === "success" ? "success" : "failed"} />
-              <span className="w-16 text-right font-mono text-[10px] text-faint">{timeAgo(g.createdAt)}</span>
+              <LiveTimeAgo date={g.createdAt} className="w-16 text-right font-mono text-[10px] text-faint" />
             </div>
           ))}
         </div>

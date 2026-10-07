@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowUpRight, BadgeCheck, Edit3, FolderOpen } from "lucide-react";
 import type { AssetPayload } from "@/lib/creative/engine";
 import { KIND_LABELS, platformById, type BrandSettings } from "@/lib/creative/presets";
-import { cx, timeAgo } from "@/lib/utils";
+import { cx } from "@/lib/utils";
+import { LiveTimeAgo } from "@/components/live-time";
 import { AssetVisual } from "@/components/ad-creative";
 import { CreativeEditorModal } from "@/components/editor/CreativeEditorModal";
 import { DynIcon, EmptyState, SectionHead } from "@/components/ui";
@@ -165,7 +166,9 @@ export function AssetLibrary({
                   <Link href={`/campaigns/${i.campaignId}`} className="group/link flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-[11.5px] font-medium text-cream/85">{i.campaignName}</div>
-                      <div className="font-mono text-[9px] uppercase tracking-widest text-faint">{i.propertyName} · {timeAgo(i.createdAt)}</div>
+                      <div className="font-mono text-[9px] uppercase tracking-widest text-faint">
+                        {i.propertyName} · <LiveTimeAgo date={i.createdAt} />
+                      </div>
                     </div>
                     <ArrowUpRight size={13} className="shrink-0 text-faint transition-colors group-hover/link:text-gold" />
                   </Link>
