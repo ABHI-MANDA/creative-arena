@@ -1,5 +1,5 @@
 # M & A — AI Real Estate Creative Studio
- node .\node_modules\next\dist\bin\next dev
+
 > **AI Real Estate Creative Agent** — turn property photos, listing web links, and plain-language briefs into professional, QC-scored, ready-to-publish property campaigns.
 >
 > 🌐 **Live Website**: (https://creativearena.netlify.app/)
