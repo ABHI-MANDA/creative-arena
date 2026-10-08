@@ -13,7 +13,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { ensureSeed } from "@/db/seed";
-import { dashboardStats, listProperties, listRecentGenerations } from "@/db/queries";
+import { dashboardStats, getOverviewActivity, listProperties } from "@/db/queries";
 import { CampaignRowCard, PropertyCard } from "@/components/cards";
 import { SectionHead, StatCard } from "@/components/ui";
 import { AssetVisual } from "@/components/ad-creative";
@@ -21,7 +21,7 @@ import { KIND_LABELS } from "@/lib/creative/presets";
 import { formatLocalDate, getGreetingForHour } from "@/lib/utils";
 import { HeroGreeting, LiveActivityTimestamp } from "@/components/live-time";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 function getInitialServerTime() {
   const now = new Date();
@@ -36,15 +36,11 @@ function getInitialServerTime() {
 
 export default async function OverviewPage() {
   await ensureSeed();
-  const [stats, props] = await Promise.all([dashboardStats(), listProperties()]);
-
-  const generations = await listRecentGenerations(500).catch(() => []);
-  const recentGens = generations.slice(0, 7);
-  const referenceTime = generations[0] ? new Date(generations[0].createdAt).getTime() : 0;
-  const spark = Array.from({ length: 8 }, (_, i) => {
-    const day = new Date(referenceTime - (7 - i) * 86400000);
-    return generations.filter((generation) => new Date(generation.createdAt).toDateString() === day.toDateString()).length;
-  });
+  const [stats, props, { recentGens, spark }] = await Promise.all([
+    dashboardStats(),
+    listProperties(),
+    getOverviewActivity(),
+  ]);
 
   const fallbackHeroAsset = {
     id: "hero-fallback",
@@ -90,10 +86,10 @@ export default async function OverviewPage() {
             An AI Creative Production Agent that understands a brand, analyzes references, plans campaigns, selects the appropriate AI models, generates content, evaluates the results, and continuously improves the campaign.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/properties/new" className="btn-gold flex items-center gap-2 rounded-xl px-5 py-3 text-[13.5px] font-semibold">
+              <Link href="/properties/new" prefetch={true} className="btn-gold flex items-center gap-2 rounded-xl px-5 py-3 text-[13.5px] font-semibold">
                 <Plus size={15} /> Create New Property
               </Link>
-              <Link href="/campaigns/new" className="btn-ghost flex items-center gap-2 rounded-xl px-5 py-3 text-[13.5px] text-gold">
+              <Link href="/campaigns/new" prefetch={true} className="btn-ghost flex items-center gap-2 rounded-xl px-5 py-3 text-[13.5px] text-gold">
                 New Campaign <ArrowUpRight size={14} />
               </Link>
             </div>
@@ -133,7 +129,7 @@ export default async function OverviewPage() {
               kicker="Portfolio"
               title="Recent Projects"
               action={
-                <Link href="/properties" className="btn-ghost rounded-lg px-3.5 py-2 text-[12px] text-mute">
+                <Link href="/properties" prefetch={true} className="btn-ghost rounded-lg px-3.5 py-2 text-[12px] text-mute">
                   All properties
                 </Link>
               }
@@ -150,7 +146,7 @@ export default async function OverviewPage() {
               kicker="Production"
               title="Campaigns"
               action={
-                <Link href="/campaigns" className="btn-ghost rounded-lg px-3.5 py-2 text-[12px] text-mute">
+                <Link href="/campaigns" prefetch={true} className="btn-ghost rounded-lg px-3.5 py-2 text-[12px] text-mute">
                   All campaigns
                 </Link>
               }
@@ -217,7 +213,7 @@ export default async function OverviewPage() {
                 <div className="font-mono text-[10px] uppercase tracking-widest text-faint">{stats.brand.tones.join(" · ")}</div>
               </div>
             </div>
-            <Link href="/brand" className="btn-ghost mt-4 flex items-center justify-center rounded-lg px-3 py-2 text-[12px] text-mute">
+            <Link href="/brand" prefetch={true} className="btn-ghost mt-4 flex items-center justify-center rounded-lg px-3 py-2 text-[12px] text-mute">
               Open Brand Kit
             </Link>
           </div>

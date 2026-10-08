@@ -7,10 +7,15 @@ import { ArrowUpRight, BadgeCheck, Edit3, FolderOpen } from "lucide-react";
 import type { AssetPayload } from "@/lib/creative/engine";
 import { KIND_LABELS, platformById, type BrandSettings } from "@/lib/creative/presets";
 import { cx } from "@/lib/utils";
+import dynamic from "next/dynamic";
 import { LiveTimeAgo } from "@/components/live-time";
 import { AssetVisual } from "@/components/ad-creative";
-import { CreativeEditorModal } from "@/components/editor/CreativeEditorModal";
 import { DynIcon, EmptyState, SectionHead } from "@/components/ui";
+
+const CreativeEditorModal = dynamic(
+  () => import("@/components/editor/CreativeEditorModal").then((mod) => mod.CreativeEditorModal),
+  { ssr: false }
+);
 
 type Item = {
   id: string;
@@ -102,7 +107,7 @@ export function AssetLibrary({
           icon={FolderOpen}
           title="Nothing generated yet"
           sub="Assets from every campaign land here — filterable by platform, format and QC status."
-          action={<Link href="/campaigns/new" className="btn-gold rounded-xl px-5 py-2.5 text-[13px] font-semibold">Generate a campaign</Link>}
+          action={<Link href="/campaigns/new" prefetch={true} className="btn-gold rounded-xl px-5 py-2.5 text-[13px] font-semibold">Generate a campaign</Link>}
         />
       ) : (
         <>
@@ -163,7 +168,7 @@ export function AssetLibrary({
                 <AssetVisual asset={i} brand={brand} />
 
                 <div className="px-3.5 py-2.5 border-t border-line/60">
-                  <Link href={`/campaigns/${i.campaignId}`} className="group/link flex items-center justify-between gap-2">
+                  <Link href={`/campaigns/${i.campaignId}`} prefetch={true} className="group/link flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-[11.5px] font-medium text-cream/85">{i.campaignName}</div>
                       <div className="font-mono text-[9px] uppercase tracking-widest text-faint">

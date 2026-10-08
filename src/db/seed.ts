@@ -39,12 +39,23 @@ const shotsFor = (set: string) =>
     sort: i,
   }));
 
+let isSeededCache = false;
+
 export async function ensureSeed(): Promise<boolean> {
-  if (isLocalJsonDb) return ensureLocalSeed();
+  if (isSeededCache) return true;
+
+  if (isLocalJsonDb) {
+    const seeded = await ensureLocalSeed();
+    if (seeded) isSeededCache = true;
+    return seeded;
+  }
 
   try {
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(properties);
-    if (count > 0) return true;
+    if (count > 0) {
+      isSeededCache = true;
+      return true;
+    }
   } catch {
     return false; // tables not provisioned yet
   }

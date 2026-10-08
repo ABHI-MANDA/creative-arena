@@ -5,6 +5,7 @@ import { assets } from "@/db/schema";
 import { readLocalDatabase, updateLocalDatabase } from "@/db/local-json";
 import { recomposeAsset, directionsFor, analyzeDNA, type AssetPayload } from "@/lib/creative/engine";
 import { getBrand, getCampaignBundle, logGeneration } from "@/db/queries";
+import { invalidateCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         await db.update(assets).set({ approved: action === "approve" }).where(eq(assets.id, id));
       }
       await logGeneration({ kind: "approval", model: "operator", campaignId: asset.campaignId, propertyId: asset.propertyId });
+      invalidateCache("assets");
+      invalidateCache(`campaign:bundle:${asset.campaignId}`);
+      invalidateCache("dashboard");
+      invalidateCache("admin");
       return NextResponse.json({ ok: true, approved: action === "approve" });
     }
 
@@ -84,6 +89,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
       await logGeneration({ kind: "visual", model: "estatescape-xl", durationMs: 1400, costCents: 11, campaignId: asset.campaignId, propertyId: asset.propertyId });
       await logGeneration({ kind: "qc", model: "qc-heuristics-1.1", durationMs: 220, costCents: 1, campaignId: asset.campaignId, propertyId: asset.propertyId });
+
+      invalidateCache("assets");
+      invalidateCache(`campaign:bundle:${asset.campaignId}`);
+      invalidateCache("dashboard");
+      invalidateCache("admin");
+
       return NextResponse.json({ ok: true, score: qc.score });
     }
 
@@ -120,6 +131,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         campaignId: asset.campaignId,
         propertyId: asset.propertyId,
       });
+
+      invalidateCache("assets");
+      invalidateCache(`campaign:bundle:${asset.campaignId}`);
+      invalidateCache("dashboard");
+      invalidateCache("admin");
 
       return NextResponse.json({ ok: true, payload: updatedPayload });
     }

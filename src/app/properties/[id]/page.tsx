@@ -14,16 +14,15 @@ import {
   Users,
 } from "lucide-react";
 import { ensureSeed } from "@/db/seed";
-import { getBrand, getProperty } from "@/db/queries";
+import { getBrand, getProperty, listPropertyCampaigns } from "@/db/queries";
 import { presetCopy } from "@/lib/creative/engine";
 import { AdCreative, type AdAssetLike } from "@/components/ad-creative";
 import { BeforeAfter } from "@/components/before-after";
 import { AnalyzeButton } from "@/components/analyze-button";
 import { CampaignRowCard } from "@/components/cards";
 import { Chip, SectionHead, StatusPill } from "@/components/ui";
-import { listCampaigns } from "@/db/queries";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 export default async function PropertyPage({
   params,
@@ -32,7 +31,7 @@ export default async function PropertyPage({
 }) {
   const { id } = await params;
   await ensureSeed();
-  const [bundle, brand, campRows] = await Promise.all([getProperty(id), getBrand(), listCampaigns()]);
+  const [bundle, brand, campRows] = await Promise.all([getProperty(id), getBrand(), listPropertyCampaigns(id)]);
   if (!bundle) notFound();
   const { property: p, images, dna, campaigns, assets } = bundle;
   const cover = images.find((i) => i.label === "Exterior")?.url ?? images[0]?.url ?? "/images/props/villa-hero.jpg";
@@ -88,16 +87,16 @@ export default async function PropertyPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 border-t border-line bg-coal/60 px-6 py-4">
-          <Link href={`/campaigns/new?property=${p.id}`} className="btn-gold flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] font-semibold">
+          <Link href={`/campaigns/new?property=${p.id}`} prefetch={true} className="btn-gold flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] font-semibold">
             Create Campaign <ArrowUpRight size={13} />
           </Link>
-          <Link href={`/campaigns/new?property=${p.id}&platforms=ig-reel`} className="btn-ghost flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] text-gold">
+          <Link href={`/campaigns/new?property=${p.id}&platforms=ig-reel`} prefetch={true} className="btn-ghost flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] text-gold">
             <PlaySquare size={14} /> Generate Reel
           </Link>
-          <Link href={`/campaigns/new?property=${p.id}&platforms=ig-post,fb-ad,ig-story`} className="btn-ghost flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] text-mute">
+          <Link href={`/campaigns/new?property=${p.id}&platforms=ig-post,fb-ad,ig-story`} prefetch={true} className="btn-ghost flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] text-mute">
             <Share2 size={14} /> Generate Social Ads
           </Link>
-          <Link href={`/assets?property=${p.id}`} className="btn-ghost flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] text-mute">
+          <Link href={`/assets?property=${p.id}`} prefetch={true} className="btn-ghost flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] text-mute">
             <FolderOpen size={14} /> View Assets ({assets.length})
           </Link>
           {!dna && <div className="ml-auto"><AnalyzeButton propertyId={p.id} /></div>}
@@ -223,7 +222,7 @@ export default async function PropertyPage({
           </div>
         ) : (
           <div className="space-y-3">
-            {campRows.filter((r) => r.campaign.propertyId === p.id).map((r) => (
+            {campRows.map((r) => (
               <CampaignRowCard key={r.campaign.id} row={r} />
             ))}
           </div>

@@ -6,6 +6,7 @@ import { analyzeDNA, directionsFor } from "@/lib/creative/engine";
 import { PRESETS, presetById } from "@/lib/creative/presets";
 import { getProperty, listCampaigns, logGeneration, setAppSetting } from "@/db/queries";
 import { ensureSeed } from "@/db/seed";
+import { invalidateCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,10 @@ export async function POST(req: Request) {
 
     await logGeneration({ kind: "directions", model: "local-direction-planner-v1", durationMs: 1400, costCents: 0, campaignId, propertyId: bundle.property.id });
     if (body.model) await setAppSetting(`campaign-model:${campaignId}`, body.model);
+
+    invalidateCache("campaigns");
+    invalidateCache("dashboard");
+    invalidateCache("admin");
 
     return NextResponse.json({ id: campaignId, directions, presets: PRESETS.length });
   } catch (e) {

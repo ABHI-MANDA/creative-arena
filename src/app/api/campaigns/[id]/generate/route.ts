@@ -19,6 +19,7 @@ import { isFreeOpenRouterModel, resolveOpenRouterModel } from "@/lib/creative/mo
 import { generateAdImage, aspectToSize } from "@/lib/creative/image-provider";
 import { writeImagePrompts } from "@/lib/creative/image-prompt-writer";
 import { getAppSetting, getBrand, getCampaignBundle, logGeneration, setAppSetting } from "@/db/queries";
+import { invalidateCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -306,6 +307,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await logGeneration({ kind: "compose", model, durationMs: Math.max(400, elapsed), costCents: 6, campaignId: id, propertyId: p.id });
     if (hasReel) await logGeneration({ kind: "video-script", model, durationMs: Math.max(400, elapsed), costCents: 0, campaignId: id, propertyId: p.id });
     await logGeneration({ kind: "qc", model: "qc-heuristics-1.1", durationMs: 210 + composed.length * 18, costCents: 2, campaignId: id, propertyId: p.id });
+
+    invalidateCache("assets");
+    invalidateCache("campaigns");
+    invalidateCache(`campaign:bundle:${id}`);
+    invalidateCache("dashboard");
+    invalidateCache("admin");
 
     return NextResponse.json({
       ok: true,

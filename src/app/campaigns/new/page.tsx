@@ -46,7 +46,7 @@ function CampaignWizard() {
     let active = true;
     setPropertiesLoading(true);
     setPropertiesError("");
-    fetch("/api/properties", { cache: "no-store" })
+    fetch("/api/properties")
       .then(async (response) => {
         if (!response.ok) throw new Error("Could not load properties.");
         return response.json() as Promise<PropertyLite[] | { items: PropertyLite[] }>;

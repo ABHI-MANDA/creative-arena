@@ -119,37 +119,57 @@ export async function generateAdImage(
   if (!apiKey) throw new Error("IMAGE_API_KEY / OPENROUTER_API_KEY is not configured.");
 
   const started = Date.now();
+  const [w, h] = (options.size ?? "1024x1024").split("x").map(Number);
 
-  const res = await fetch(`${apiBase}/images/generations`, {
-    method: "POST",
-    signal: AbortSignal.timeout(options.timeoutMs ?? 90_000),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      prompt,
-      n: 1,
-      size: options.size ?? "1024x1024",
-      response_format: "url",
-    }),
-  });
+  try {
+    const res = await fetch(`${apiBase}/images/generations`, {
+      method: "POST",
+      signal: AbortSignal.timeout(options.timeoutMs ?? 90_000),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        prompt,
+        n: 1,
+        size: options.size ?? "1024x1024",
+        response_format: "url",
+      }),
+    });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Image generation API returned ${res.status}: ${body.slice(0, 240)}`);
+    if (res.ok) {
+      const data = (await res.json()) as { data?: { url?: string; b64_json?: string }[] };
+      const item = data.data?.[0];
+      if (item?.url || item?.b64_json) {
+        const url = item.url ?? `data:image/png;base64,${item.b64_json}`;
+        const durationMs = Date.now() - started;
+        const { score, details } = evaluateImageQuality(prompt, model, durationMs, Boolean(item.url));
+        return { url, prompt, model, qualityScore: score, qualityDetails: details, durationMs };
+      }
+    } else {
+      const body = await res.text().catch(() => "");
+      console.warn(`[image-provider] Primary image API returned ${res.status}: ${body.slice(0, 160)}. Falling back to unlimited FLUX.1 engine...`);
+    }
+  } catch (err) {
+    console.warn("[image-provider] Primary image API connection error, falling back to unlimited FLUX.1 engine:", err);
   }
 
-  const data = (await res.json()) as { data?: { url?: string; b64_json?: string }[] };
-  const item = data.data?.[0];
-  if (!item?.url && !item?.b64_json) {
-    throw new Error("Image generation API returned no image data.");
+  /* ---- Unlimited Free FLUX.1 Engine Fallback ---- */
+  const freeFluxUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w || 1024}&height=${h || 1024}&nologo=true&model=flux`;
+  const fluxRes = await fetch(freeFluxUrl, { signal: AbortSignal.timeout(options.timeoutMs ?? 60_000) });
+  if (!fluxRes.ok) {
+    throw new Error(`FLUX.1 image generator returned status ${fluxRes.status}`);
   }
 
-  const url = item.url ?? `data:image/png;base64,${item.b64_json}`;
   const durationMs = Date.now() - started;
-  const { score, details } = evaluateImageQuality(prompt, model, durationMs, Boolean(item.url));
-
-  return { url, prompt, model, qualityScore: score, qualityDetails: details, durationMs };
+  const { score, details } = evaluateImageQuality(prompt, "black-forest-labs/FLUX.1-schnell:free", durationMs, true);
+  return {
+    url: freeFluxUrl,
+    prompt,
+    model: "black-forest-labs/FLUX.1-schnell:free",
+    qualityScore: score,
+    qualityDetails: details,
+    durationMs,
+  };
 }

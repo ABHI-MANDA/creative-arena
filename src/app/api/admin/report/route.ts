@@ -129,15 +129,71 @@ export async function GET(request: Request) {
           generations: database.generations,
         }))
       : await Promise.all([
-          db.select().from(properties),
-          db.select().from(campaigns),
-          db.select().from(assets),
-          db.select().from(generations),
+          db
+            .select({
+              id: properties.id,
+              name: properties.name,
+              createdAt: properties.createdAt,
+              status: properties.status,
+              propertyType: properties.propertyType,
+              price: properties.price,
+              audience: properties.audience,
+              amenities: properties.amenities,
+              description: properties.description,
+              source: properties.source,
+            })
+            .from(properties),
+          db
+            .select({
+              id: campaigns.id,
+              propertyId: campaigns.propertyId,
+              name: campaigns.name,
+              createdAt: campaigns.createdAt,
+              status: campaigns.status,
+              presetLabel: campaigns.presetLabel,
+              platforms: campaigns.platforms,
+            })
+            .from(campaigns),
+          db
+            .select({
+              id: assets.id,
+              campaignId: assets.campaignId,
+              propertyId: assets.propertyId,
+              createdAt: assets.createdAt,
+              status: assets.status,
+              approved: assets.approved,
+              title: assets.title,
+              kind: assets.kind,
+              platform: assets.platform,
+              score: assets.score,
+              aspect: assets.aspect,
+              checks: assets.checks,
+              payload: assets.payload,
+            })
+            .from(assets)
+            .limit(500),
+          db
+            .select({
+              id: generations.id,
+              createdAt: generations.createdAt,
+              status: generations.status,
+              kind: generations.kind,
+              propertyId: generations.propertyId,
+              campaignId: generations.campaignId,
+              durationMs: generations.durationMs,
+              costCents: generations.costCents,
+              model: generations.model,
+            })
+            .from(generations)
+            .limit(500),
         ]).then(([propertyRows, campaignRows, assetRows, generationRows]) => ({
-          properties: propertyRows,
-          campaigns: campaignRows,
-          assets: assetRows,
-          generations: generationRows,
+          properties: propertyRows as any,
+          campaigns: campaignRows as any,
+          assets: assetRows.map((a) => {
+            const { designJson: _stripped, ...safePayload } = (a.payload || {}) as Record<string, unknown> & { designJson?: unknown };
+            return { ...a, payload: safePayload as any };
+          }) as any,
+          generations: generationRows as any,
         }));
 
     const params = new URL(request.url).searchParams;

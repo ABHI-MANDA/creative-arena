@@ -3,7 +3,7 @@ import { ensureSeed } from "@/db/seed";
 import { getBrand, getCampaignBundle, listCampaignActions } from "@/db/queries";
 import { CampaignWorkspace } from "./workspace";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 15;
 
 export default async function CampaignPage({
   params,

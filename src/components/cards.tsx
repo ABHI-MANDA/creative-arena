@@ -10,11 +10,12 @@ export function PropertyCard({ card }: { card: PropertyCardT }) {
   const cover = images.find((i) => i.label === "Exterior")?.url ?? images[0]?.url;
   return (
     <div className="panel panel-hover group overflow-hidden">
-      <Link href={`/properties/${p.id}`} className="relative block aspect-[16/8.6] overflow-hidden">
+      <Link href={`/properties/${p.id}`} prefetch={true} className="relative block aspect-[16/8.6] overflow-hidden">
         {cover && (
           <img
             src={cover}
             alt={p.name}
+            loading="lazy"
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.045]"
           />
         )}
@@ -47,13 +48,13 @@ export function PropertyCard({ card }: { card: PropertyCardT }) {
         <span className="font-mono">{images.length} shots</span>
       </div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        <Link href={`/campaigns/new?property=${p.id}`} className="btn-gold flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] font-semibold">
+        <Link href={`/campaigns/new?property=${p.id}`} prefetch={true} className="btn-gold flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] font-semibold">
           Create Campaign <ArrowRight size={12} />
         </Link>
-        <Link href={`/campaigns/new?property=${p.id}&platforms=ig-reel`} className="btn-ghost flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-gold">
+        <Link href={`/campaigns/new?property=${p.id}&platforms=ig-reel`} prefetch={true} className="btn-ghost flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-gold">
           <PlaySquare size={12.5} /> Generate Reel
         </Link>
-        <Link href={`/campaigns/new?property=${p.id}&platforms=ig-post,fb-ad,ig-story`} className="btn-ghost col-span-2 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-mute">
+        <Link href={`/campaigns/new?property=${p.id}&platforms=ig-post,fb-ad,ig-story`} prefetch={true} className="btn-ghost col-span-2 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-mute">
           <Share2 size={12.5} /> Generate Social Ads · Instagram + Facebook + Story
         </Link>
       </div>
@@ -66,11 +67,12 @@ export function CampaignRowCard({ row }: { row: CampaignRow }) {
   return (
     <Link
       href={`/campaigns/${c.id}`}
+      prefetch={true}
       className="panel panel-hover group flex items-center gap-4 px-4 py-3.5"
     >
       <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg hairline">
         {cover ? (
-          <img src={cover} alt={c.name} className="absolute inset-0 h-full w-full object-cover" />
+          <img src={cover} alt={c.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-panel2 text-faint">
             <Building2 size={16} />

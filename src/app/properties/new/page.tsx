@@ -112,12 +112,22 @@ export default function NewPropertyPage() {
         const reader = new FileReader();
         reader.onload = () => {
           img.onload = () => {
-            const scale = Math.min(1, 1000 / img.width);
+            const maxDim = 640;
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
             const c = document.createElement("canvas");
             c.width = Math.round(img.width * scale);
             c.height = Math.round(img.height * scale);
-            c.getContext("2d")?.drawImage(img, 0, 0, c.width, c.height);
-            resolve(c.toDataURL("image/jpeg", 0.82));
+            const ctx = c.getContext("2d");
+            if (ctx) {
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = "high";
+              ctx.drawImage(img, 0, 0, c.width, c.height);
+            }
+            let compressed = c.toDataURL("image/webp", 0.65);
+            if (!compressed.startsWith("data:image/webp")) {
+              compressed = c.toDataURL("image/jpeg", 0.68);
+            }
+            resolve(compressed);
           };
           img.src = String(reader.result);
         };

@@ -11,7 +11,7 @@ export default async function AssetsPage({
 }) {
   const { property } = await searchParams;
   await ensureSeed();
-  const [lib, brand] = await Promise.all([listLibraryAssets(), getBrand()]);
+  const [lib, brand] = await Promise.all([listLibraryAssets(property), getBrand()]);
 
   const items = lib.map((l) => {
     // Strip designJson from the payload — it may contain serialised Fabric objects

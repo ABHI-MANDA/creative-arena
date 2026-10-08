@@ -21,7 +21,7 @@ import { EmptyState, SectionHead, StatusPill } from "@/components/ui";
 import { LiveTimeAgo } from "@/components/live-time";
 import { AdminReport } from "./admin-report";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 export default async function AdminPage() {
   await ensureSeed();

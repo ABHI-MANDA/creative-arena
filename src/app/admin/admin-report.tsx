@@ -44,18 +44,27 @@ export function AdminReport() {
   const [type, setType] = useState("all");
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [records, setRecords] = useState<ReportRecord[]>([]);
   const [totals, setTotals] = useState<ReportTotals>({ records: 0, generations: 0, failures: 0, costCents: 0, approvedAssets: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const query = filterQuery(range, type, status, deferredSearch);
+
+  // Debounce search by 400ms to eliminate redundant database queries while user types
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const query = filterQuery(range, type, status, debouncedSearch);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    fetch(`/api/admin/report?${query}`, { cache: "no-store", signal: controller.signal })
+    fetch(`/api/admin/report?${query}`, { signal: controller.signal })
       .then(async (response) => {
         const data = await response.json() as { records?: ReportRecord[]; totals?: ReportTotals; error?: string };
         if (!response.ok) throw new Error(data.error ?? "Could not load report.");

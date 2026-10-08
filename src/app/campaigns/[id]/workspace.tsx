@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import JSZip from "jszip";
-import { toJpeg, toPng } from "html-to-image";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -34,10 +33,14 @@ import { cx, ratioOf } from "@/lib/utils";
 import { createRoot } from "react-dom/client";
 import { AdCreative, AssetVisual } from "@/components/ad-creative";
 import { PipelineOverlay } from "@/components/pipeline";
-import { CreativeEditorModal } from "@/components/editor/CreativeEditorModal";
 import { QualityPanel } from "@/components/quality";
 import { Storyboard } from "@/components/storyboard";
 import { Chip, DynIcon, SectionHead, StatusPill } from "@/components/ui";
+
+const CreativeEditorModal = dynamic(
+  () => import("@/components/editor/CreativeEditorModal").then((mod) => mod.CreativeEditorModal),
+  { ssr: false }
+);
 
 type AssetLite = {
   id: string;
@@ -369,6 +372,7 @@ async function renderAssetDOMToBlob(
     };
 
     frame.classList.add("ad-render-export");
+    const { toJpeg, toPng } = await import("html-to-image");
     const dataUrl = format === "png"
       ? await toPng(frame, options)
       : await toJpeg(frame, { ...options, quality: 0.96 });
@@ -816,7 +820,8 @@ export function CampaignWorkspace({
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
 
-      const zip = new JSZip();
+      const JSZipModule = (await import("jszip")).default;
+      const zip = new JSZipModule();
       const imageFiles = new Map<string, string>();
       const pendingExports: { assetId: string; format: ImageExportFormat; blob: Blob }[] = [];
 

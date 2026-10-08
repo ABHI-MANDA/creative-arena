@@ -79,7 +79,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="relative z-10 flex min-h-screen">
       {/* Sidebar */}
       <aside className="sticky top-0 hidden h-screen w-[232px] shrink-0 flex-col border-r border-line bg-coal/70 backdrop-blur-xl md:flex">
-        <Link href="/" className="flex items-center gap-3 border-b border-line px-5 py-5">
+        <Link href="/" prefetch={true} className="flex items-center gap-3 border-b border-line px-5 py-5">
           <Image src="/images/brand-logo.png" alt="M & A" width={36} height={36} className="h-9 w-9 object-contain" />
           <div>
             <div className="font-display text-[17px] font-medium tracking-wide">M &amp; A</div>
@@ -103,6 +103,7 @@ export function Shell({ children }: { children: ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={true}
                     className={cx(
                       "mb-0.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] transition-all",
                       active
@@ -122,6 +123,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <div className="border-t border-line p-3">
           <Link
             href="/properties/new"
+            prefetch={true}
             className="btn-gold flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-semibold"
           >
             <Plus size={15} /> New Property
@@ -169,6 +171,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </span>
             <Link
               href="/campaigns/new"
+              prefetch={true}
               className="btn-ghost flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-medium text-gold"
             >
               <Sparkles size={14} /> <span className="hidden sm:inline">Quick Campaign</span>
@@ -184,7 +187,7 @@ export function Shell({ children }: { children: ReactNode }) {
             const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} className={cx("p-2", active ? "text-gold" : "text-faint")}>
+              <Link key={item.href} href={item.href} prefetch={true} className={cx("p-2", active ? "text-gold" : "text-faint")}>
                 <Icon size={19} />
               </Link>
             );

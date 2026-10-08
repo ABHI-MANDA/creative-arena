@@ -243,3 +243,9 @@ export function DynIcon({ name, size = 15, className }: { name: string; size?: n
   const Icon = ICONS[name] ?? Globe;
   return <Icon size={size} className={className} />;
 }
+
+/* ---------- skeleton loader ---------- */
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cx("animate-pulse rounded-lg bg-panel2/80", className)} />;
+}
+

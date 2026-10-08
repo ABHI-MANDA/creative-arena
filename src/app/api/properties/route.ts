@@ -5,6 +5,7 @@ import { updateLocalDatabase } from "@/db/local-json";
 import { analyzeDNA, type Brief } from "@/lib/creative/engine";
 import { listProperties, logGeneration } from "@/db/queries";
 import { ensureSeed } from "@/db/seed";
+import { invalidateCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +111,9 @@ export async function POST(req: Request) {
         })();
 
     await logGeneration({ kind: "analysis", model: "aurum-vision-v2", durationMs: 900 + (images.length * 130), costCents: 4, propertyId });
+    invalidateCache("properties");
+    invalidateCache("dashboard");
+    invalidateCache("admin");
 
     return NextResponse.json({ id: propertyId });
   } catch (e) {

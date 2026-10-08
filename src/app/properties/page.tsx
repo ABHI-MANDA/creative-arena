@@ -5,7 +5,7 @@ import { listProperties } from "@/db/queries";
 import { PropertyCard } from "@/components/cards";
 import { EmptyState, SectionHead } from "@/components/ui";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 export default async function PropertiesPage() {
   await ensureSeed();
@@ -17,7 +17,7 @@ export default async function PropertiesPage() {
         kicker="Portfolio"
         title={`Properties · ${props.length}`}
         action={
-          <Link href="/properties/new" className="btn-gold flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] font-semibold">
+          <Link href="/properties/new" prefetch={true} className="btn-gold flex items-center gap-2 rounded-xl px-4 py-2.5 text-[12.5px] font-semibold">
             <Plus size={14} /> New Property
           </Link>
         }
@@ -28,7 +28,7 @@ export default async function PropertiesPage() {
           title="No properties yet"
           sub="Add your first project — paste a website URL, upload photography, or start from the sample library."
           action={
-            <Link href="/properties/new" className="btn-gold rounded-xl px-5 py-2.5 text-[13px] font-semibold">
+            <Link href="/properties/new" prefetch={true} className="btn-gold rounded-xl px-5 py-2.5 text-[13px] font-semibold">
               Create property
             </Link>
           }

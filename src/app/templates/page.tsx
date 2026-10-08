@@ -14,7 +14,7 @@ import { AssetVisual, type AdAssetLike } from "@/components/ad-creative";
 import { Chip, DynIcon, SectionHead } from "@/components/ui";
 import { TemplateManager } from "./template-manager";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 const bp = SAMPLE_BLUEPRINTS[0];
 const brief = { name: bp.name, location: bp.location, propertyType: bp.propertyType, price: bp.price, audience: bp.audience, amenities: bp.amenities };
