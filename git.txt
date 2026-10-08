@@ -122,19 +122,24 @@ where production cloud servers running in UTC timezone always served 'Good morni
 stale UTC timestamps.
 
 
-12. PUSH CHANGES TO GITHUB
+13. NEON EGRESS & ZERO-LATENCY PAGE NAVIGATION OPTIMIZATION
 --------------------------------------------------------------------------------
 Command:
-git push -u origin main
-
-(or):
+git add .
+git commit -m "perf: reduce click latency to ~0ms via prefetch, ISR, route skeletons, and code splitting"
 git push origin main
 
 Description:
-Uploads your local commits from branch 'main' to GitHub.
-Note: If prompted in terminal or browser, authenticate with your GitHub credentials
-or a GitHub Personal Access Token (PAT).
+1. Overhauls database queries with explicit column projections (zero SELECT *).
+2. Implements in-memory TTL caching with in-flight query deduplication.
+3. Enables ISR static pre-rendering (revalidate) across pages with edge caching.
+4. Adds prefetch={true} to all sidebar, header, and card links for instant 0ms transitions.
+5. Implements instant skeleton loaders (loading.tsx) for all routes to prevent click delays.
+6. Code-splits heavy client modules (Fabric.js, JSZip, html-to-image) via next/dynamic.
+7. Configures next.config.ts with Brotli/Gzip compression and package import optimization.
 ================================================================================
+
+
 
 
 
