@@ -1,0 +1,34 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: creative-arena:latest
+    container_name: creative-arena-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      # If using remote Postgres (e.g., Neon), set DATABASE_URL in .env and LOCAL_JSON_DB=false
+      # If using local file database, LOCAL_JSON_DB=true is used and persisted via volume below
+      - LOCAL_JSON_DB=${LOCAL_JSON_DB:-true}
+    volumes:
+      # Persists campaigns and properties when running with local JSON database
+      - creative-arena-data:/app/.local-db
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  creative-arena-data:
+    driver: local
+
