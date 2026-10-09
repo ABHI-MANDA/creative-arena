@@ -91,11 +91,11 @@ export default async function TemplatesPage() {
 
       {/* aspect system */}
       <div className="mt-10">
-        <SectionHead kicker="Formats" title="Platform-first aspect system" />
+        <SectionHead kicker="Formats" title="Aspect ratio system" />
         <div className="panel grid gap-0 overflow-hidden sm:grid-cols-2 lg:grid-cols-4">
           {PLATFORMS.map((pl, i) => (
             <div key={pl.id} className="anim-up flex items-center gap-3.5 border-b border-line/60 px-5 py-4 sm:border-r" style={{ animationDelay: `${i * 30}ms` }}>
-              <span className="rounded-lg border border-line bg-panel2 p-2 text-gold"><DynIcon name={pl.icon} size={15} /></span>
+              <span className="rounded-lg border border-line bg-panel2 p-2 text-gold"><DynIcon name={pl.icon || "Crop"} size={15} /></span>
               <div className="flex-1">
                 <div className="text-[13px] font-medium">{pl.label}</div>
                 <div className="font-mono text-[9.5px] uppercase tracking-widest text-faint">{pl.note}</div>

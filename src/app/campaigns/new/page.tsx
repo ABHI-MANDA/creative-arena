@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Loader2, Music2, Palette, Sparkles, Wand2 } from "lucide-react";
 import { PLATFORMS, PRESETS } from "@/lib/creative/presets";
-import type { Direction } from "@/lib/creative/engine";
+import type { ApprovedAdContent, Direction } from "@/lib/creative/engine";
 import { DynIcon } from "@/components/ui";
-import { cx } from "@/lib/utils";
+import { aspectCss, cx, ratioOf } from "@/lib/utils";
 import type { OpenRouterModel } from "@/lib/creative/models";
 
 type PropertyLite = {
@@ -30,10 +30,11 @@ function CampaignWizard() {
   const [propertyLoadAttempt, setPropertyLoadAttempt] = useState(0);
   const [preset, setPreset] = useState("luxury-property");
   const [platforms, setPlatforms] = useState<string[]>(
-    params.get("platforms")?.split(",").filter(Boolean) ?? ["ig-post", "ig-reel", "ig-story"]
+    params.get("platforms")?.split(",").filter(Boolean) ?? ["9:16", "1:1", "4:5", "16:9"]
   );
-  const [stage, setStage] = useState<"brief" | "directions">("brief");
+  const [stage, setStage] = useState<"brief" | "directions" | "review">("brief");
   const [directions, setDirections] = useState<Direction[]>([]);
+  const [contentDraft, setContentDraft] = useState<ApprovedAdContent | null>(null);
   const [campaignId, setCampaignId] = useState("");
   const [modelSelection, setModelSelection] = useState("auto");
   const [models, setModels] = useState<OpenRouterModel[]>([]);
@@ -108,14 +109,39 @@ function CampaignWizard() {
     }
   };
 
-  const generate = async () => {
+  const prepareReview = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/prepare-content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directionId: directions[selectedDir]?.id, model: modelSelection }),
+      });
+      const data = (await res.json()) as { ok?: boolean; content?: ApprovedAdContent; error?: string };
+      if (!res.ok || !data.content) throw new Error(data.error ?? "Failed to prepare ad content for review");
+      setContentDraft(data.content);
+      setStage("review");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to prepare ad content");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const generateWithApproval = async () => {
+    if (!contentDraft) return;
     setBusy(true);
     setError("");
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ directionId: directions[selectedDir]?.id, model: modelSelection }),
+        body: JSON.stringify({
+          directionId: directions[selectedDir]?.id,
+          model: modelSelection,
+          approvedContent: contentDraft,
+        }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Generation failed");
@@ -192,41 +218,41 @@ function CampaignWizard() {
               ))}
             </div>
 
-            {/* platforms */}
-            <div className="label mb-3 mt-8">3 · Where will you post?</div>
-            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+            {/* aspect ratios */}
+            <div className="label mb-3 mt-8">3 · Aspect Ratios</div>
+            <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
               {PLATFORMS.map((pl) => {
                 const on = platforms.includes(pl.id);
+                const r = ratioOf(pl.aspect);
                 return (
-                  <button key={pl.id} onClick={() => togglePlatform(pl.id)} className={cx("sel-card flex items-center gap-3 rounded-xl p-3.5 text-left", on && "sel-on")}>
-                    <DynIcon name={pl.icon} size={17} className={on ? "text-gold" : "text-mute"} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[12.5px] font-medium">{pl.label}</div>
-                      <div className="font-mono text-[9.5px] uppercase tracking-widest text-faint">{pl.aspect} · {pl.note}</div>
+                  <button
+                    key={pl.id}
+                    type="button"
+                    onClick={() => togglePlatform(pl.id)}
+                    className={cx("sel-card flex flex-col items-center justify-center gap-2.5 rounded-xl p-3 text-center transition-all", on && "sel-on")}
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-line bg-panel2">
+                      <div
+                        className={cx("rounded-[2px] border transition-colors", on ? "border-gold bg-gold/30" : "border-mute bg-mute/20")}
+                        style={{
+                          aspectRatio: aspectCss(pl.aspect),
+                          maxHeight: 34,
+                          maxWidth: 34,
+                          height: r <= 1 ? 32 : Math.round(32 / r),
+                          width: r >= 1 ? 32 : Math.round(32 * r),
+                        }}
+                      />
                     </div>
-                    <span className={cx("flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border", on ? "border-gold bg-gold text-[#171208]" : "border-line")}>
-                      {on && <Check size={10} strokeWidth={4} />}
+                    <div className="font-mono text-[13.5px] font-bold text-cream">{pl.aspect}</div>
+                    <span className={cx("flex h-4 w-4 shrink-0 items-center justify-center rounded border", on ? "border-gold bg-gold text-[#171208]" : "border-line")}>
+                      {on && <Check size={9} strokeWidth={4} />}
                     </span>
                   </button>
                 );
               })}
             </div>
 
-            {error && <p className="mt-4 text-[12.5px] text-rust">{error}</p>}
-            <div className="mt-8 flex items-center justify-between border-t border-line pt-5">
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
-                {chosenPreset.objective} · {platforms.length} platform{platforms.length === 1 ? "" : "s"}
-              </span>
-              <button onClick={getDirections} disabled={!valid || busy} className="btn-gold flex items-center gap-2 rounded-xl px-6 py-3 text-[13.5px] font-semibold disabled:opacity-40">
-                {busy ? <Loader2 size={15} className="spin-slow" /> : <Sparkles size={15} />}
-                Propose Creative Directions
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
+            {/* generation model */}
             <div className="mt-8 max-w-xl">
               <label htmlFor="creative-model" className="label mb-2 block">4 · Generation model</label>
               <select id="creative-model" value={modelSelection} onChange={(event) => setModelSelection(event.target.value)} className="input w-full">
@@ -237,6 +263,20 @@ function CampaignWizard() {
               </select>
               <p className="mt-1.5 text-[10.5px] text-faint">{modelMessage}. Chosen model and fallback are logged with generation activity.</p>
             </div>
+
+            {error && <p className="mt-4 text-[12.5px] text-rust">{error}</p>}
+            <div className="mt-8 flex items-center justify-between border-t border-line pt-5">
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
+                {chosenPreset.objective} · {platforms.length} aspect ratio{platforms.length === 1 ? "" : "s"}
+              </span>
+              <button onClick={getDirections} disabled={!valid || busy} className="btn-gold flex items-center gap-2 rounded-xl px-6 py-3 text-[13.5px] font-semibold disabled:opacity-40">
+                {busy ? <Loader2 size={15} className="spin-slow" /> : <Sparkles size={15} />}
+                Propose Creative Directions
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {stage === "directions" && (
         <div className="anim-up">
           <div className="mb-6 flex items-end justify-between">
@@ -300,10 +340,269 @@ function CampaignWizard() {
               <span className="flex items-center gap-1.5"><Palette size={12} /> {directions[selectedDir]?.grade}</span>
             </div>
             {error && <p className="text-[12.5px] text-rust">{error}</p>}
-            <button onClick={generate} disabled={busy} className="btn-gold flex items-center gap-2 rounded-xl px-7 py-3.5 text-[14px] font-semibold disabled:opacity-50">
-              {busy ? <Loader2 size={15} className="spin-slow" /> : <Wand2 size={15} />}
-              Generate Campaign <ArrowRight size={14} />
+            <button onClick={prepareReview} disabled={busy} className="btn-gold flex items-center gap-2 rounded-xl px-7 py-3.5 text-[14px] font-semibold disabled:opacity-50">
+              {busy ? <Loader2 size={15} className="spin-slow" /> : <Sparkles size={15} />}
+              Review &amp; Approve Content <ArrowRight size={14} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {stage === "review" && contentDraft && (
+        <div className="anim-up">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.3em] text-gold">
+                <span>Step 3 · Content Review &amp; Approval</span>
+                <span className="rounded-full bg-gold/15 px-2 py-0.5 text-gold border border-gold/30">
+                  Awaiting Approval
+                </span>
+              </div>
+              <h1 className="font-display mt-2 text-[30px] font-medium leading-tight">
+                Review &amp; correct contents before final output.
+              </h1>
+              <p className="mt-1.5 text-[13px] text-mute">
+                Review the exact headline, configuration, price, highlights, and visual prompt that will appear on the property images before approving generation.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setStage("directions")}
+                className="btn-ghost rounded-xl px-4 py-2.5 text-[12px] text-mute"
+              >
+                <ArrowLeft size={13} className="mr-1.5 inline" /> Back to directions
+              </button>
+              <button
+                onClick={prepareReview}
+                disabled={busy}
+                className="btn-ghost rounded-xl px-4 py-2.5 text-[12px] text-cream/90 border border-line hover:border-gold/50"
+              >
+                {busy ? <Loader2 size={13} className="spin-slow mr-1.5 inline" /> : <Sparkles size={13} className="mr-1.5 inline text-gold" />}
+                Re-draft with AI
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-7 lg:grid-cols-12 items-start">
+            {/* Left Column: Editable Fields */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="panel p-5.5 space-y-4 border border-line/80">
+                <div className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-gold font-semibold flex items-center justify-between">
+                  <span>Ad Poster Typography &amp; Copy</span>
+                  <span className="text-faint text-[9.5px]">Editable Contents</span>
+                </div>
+
+                {/* Developer & Project */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label mb-1.5 text-[11px]">Developer / Brand</label>
+                    <input
+                      type="text"
+                      className="input w-full font-sans text-[13px]"
+                      value={contentDraft.developer}
+                      onChange={(e) => setContentDraft({ ...contentDraft, developer: e.target.value })}
+                      placeholder="e.g. PURAVANKARA"
+                    />
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 text-[11px]">Project Name / Headline</label>
+                    <input
+                      type="text"
+                      className="input w-full font-sans text-[13px] font-semibold"
+                      value={contentDraft.project}
+                      onChange={(e) => setContentDraft({ ...contentDraft, project: e.target.value })}
+                      placeholder="e.g. CODENAME PARK"
+                    />
+                  </div>
+                </div>
+
+                {/* Tagline */}
+                <div>
+                  <label className="label mb-1.5 text-[11px]">Tagline / Hook</label>
+                  <input
+                    type="text"
+                    className="input w-full font-sans text-[13px]"
+                    value={contentDraft.tagline}
+                    onChange={(e) => setContentDraft({ ...contentDraft, tagline: e.target.value })}
+                    placeholder="e.g. WHERE LUXURY MEETS NATURE"
+                  />
+                </div>
+
+                {/* BHK & Location */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label mb-1.5 text-[11px]">Configuration (BHK Highlight)</label>
+                    <input
+                      type="text"
+                      className="input w-full font-sans text-[13px] font-bold text-gold"
+                      value={contentDraft.bhk}
+                      onChange={(e) => setContentDraft({ ...contentDraft, bhk: e.target.value })}
+                      placeholder="e.g. 3 & 4 BHK"
+                    />
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 text-[11px]">Typology &amp; Location</label>
+                    <input
+                      type="text"
+                      className="input w-full font-sans text-[13px]"
+                      value={contentDraft.locationTag}
+                      onChange={(e) => setContentDraft({ ...contentDraft, locationTag: e.target.value })}
+                      placeholder="e.g. LUXURY RESIDENCES IN HENNUR"
+                    />
+                  </div>
+                </div>
+
+                {/* Key Amenities Line */}
+                <div>
+                  <label className="label mb-1.5 text-[11px]">Key Amenities Line (pipe-separated)</label>
+                  <input
+                    type="text"
+                    className="input w-full font-sans text-[13px]"
+                    value={contentDraft.amenitiesLine}
+                    onChange={(e) => setContentDraft({ ...contentDraft, amenitiesLine: e.target.value })}
+                    placeholder="e.g. 80% OPEN SPACES | 20 WORLD CLASS AMENITIES"
+                  />
+                </div>
+
+                {/* Starting Price & CTA */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label mb-1.5 text-[11px]">Starting Price Block</label>
+                    <input
+                      type="text"
+                      className="input w-full font-sans text-[13px] font-bold text-cream"
+                      value={contentDraft.price}
+                      onChange={(e) => setContentDraft({ ...contentDraft, price: e.target.value })}
+                      placeholder="e.g. ₹3.2 CR*"
+                    />
+                  </div>
+                  <div>
+                    <label className="label mb-1.5 text-[11px]">Button Text (CTA)</label>
+                    <input
+                      type="text"
+                      className="input w-full font-sans text-[13px] font-semibold text-gold"
+                      value={contentDraft.cta}
+                      onChange={(e) => setContentDraft({ ...contentDraft, cta: e.target.value })}
+                      placeholder="BOOK NOW"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Image Generation Prompt */}
+              <div className="panel p-5.5 space-y-2.5 border border-line/80">
+                <div className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-gold font-semibold flex items-center justify-between">
+                  <span>AI Image Visual Prompt (Agnes AI / FLUX)</span>
+                  <span className="text-faint text-[9.5px]">Photographic Brief</span>
+                </div>
+                <p className="text-[11.5px] text-faint">
+                  This prompt controls the background architecture, swimming pool, lighting, and environment generated for your ad.
+                </p>
+                <textarea
+                  rows={3}
+                  className="input w-full font-mono text-[12px] leading-relaxed resize-y"
+                  value={contentDraft.imagePrompt}
+                  onChange={(e) => setContentDraft({ ...contentDraft, imagePrompt: e.target.value })}
+                  placeholder="Describe the architectural facade, materials, lighting..."
+                />
+              </div>
+
+              {/* Approval Button Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                <p className="text-[12px] text-mute flex items-center gap-1.5">
+                  <Check size={14} className="text-gold" /> Ready to generate final output across {platforms.length} aspect ratios.
+                </p>
+                {error && <p className="text-[12.5px] text-rust">{error}</p>}
+                <button
+                  onClick={generateWithApproval}
+                  disabled={busy}
+                  className="btn-gold flex items-center gap-2 rounded-xl px-8 py-3.5 text-[14px] font-semibold shadow-lg shadow-gold/10 disabled:opacity-50"
+                >
+                  {busy ? <Loader2 size={16} className="spin-slow" /> : <Sparkles size={16} />}
+                  Approve &amp; Generate Final Output <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column: Live Mock Card */}
+            <div className="lg:col-span-5 sticky top-6">
+              <div className="panel p-4.5 border border-gold/30 bg-coal/90 space-y-3">
+                <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.2em] text-faint border-b border-line pb-2.5">
+                  <span className="text-gold font-medium">Live Visual Mock</span>
+                  <span>Real-time Layout Preview</span>
+                </div>
+
+                {/* Ad Preview Frame mirroring reference image layout */}
+                <div
+                  className="relative w-full rounded-xl overflow-hidden flex flex-col justify-between shadow-2xl border border-line"
+                  style={{
+                    aspectRatio: "4/5",
+                    background: "linear-gradient(180deg, #0b130e 0%, #111a14 45%, #080d09 100%)",
+                  }}
+                >
+                  {/* Subtle architectural background mockup */}
+                  <div
+                    className="absolute inset-0 opacity-40 bg-cover bg-center pointer-events-none"
+                    style={{
+                      backgroundImage: `url(${properties.find((p) => p.id === propertyId)?.cover || "/images/props/villa-hero.jpg"})`,
+                    }}
+                  />
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: "linear-gradient(180deg, rgba(6,10,8,0.78) 0%, rgba(6,10,8,0.25) 35%, transparent 50%, rgba(4,8,6,0.6) 80%, rgba(3,6,5,0.95) 100%)"
+                    }}
+                  />
+
+                  {/* Top Typography Zone */}
+                  <div className="relative z-10 pt-5 px-4 text-center">
+                    <div className="font-sans font-bold tracking-[0.18em] text-white text-[11px] drop-shadow">
+                      {contentDraft.developer || "DEVELOPER"}
+                    </div>
+                    <div className="font-sans font-extrabold uppercase tracking-[0.05em] text-white text-[19px] leading-tight mt-1 drop-shadow-md">
+                      {contentDraft.project || "PROJECT NAME"}
+                    </div>
+                    <div className="mt-1 flex flex-col items-center">
+                      <p className="font-sans font-semibold tracking-[0.14em] text-white/95 text-[9px] drop-shadow">
+                        {contentDraft.tagline || "WHERE LUXURY MEETS NATURE"}
+                      </p>
+                      <div className="w-16 h-[1px] bg-white/40 mt-1" />
+                    </div>
+                    <div className="font-sans font-black tracking-tight text-white text-[24px] leading-none mt-2 drop-shadow-lg">
+                      {contentDraft.bhk || "3 & 4 BHK"}
+                    </div>
+                    <div className="font-sans font-semibold tracking-[0.2em] text-white/90 text-[8.5px] mt-1 drop-shadow">
+                      {contentDraft.locationTag || "LUXURY RESIDENCES"}
+                    </div>
+                    <div className="font-sans font-medium tracking-[0.1em] text-white/85 text-[8px] mt-1 drop-shadow">
+                      {contentDraft.amenitiesLine || "80% OPEN SPACES | 20 WORLD CLASS AMENITIES"}
+                    </div>
+                    <div className="mt-2 flex flex-col items-center">
+                      <div className="font-sans font-semibold tracking-[0.18em] text-white/80 text-[7px] flex items-center gap-2">
+                        <span className="w-4 h-[1px] bg-white/40" />
+                        <span>STARTING FROM</span>
+                        <span className="w-4 h-[1px] bg-white/40" />
+                      </div>
+                      <div className="font-sans font-black text-white text-[16px] leading-none mt-0.5 drop-shadow-md">
+                        {contentDraft.price || "₹3.2 CR*"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Middle open space for visual */}
+                  <div className="flex-1" />
+
+                  {/* Bottom White Bar: "BOOK NOW" */}
+                  <div className="relative z-10 w-full text-center font-sans font-bold text-[#0c120e] bg-white py-2.5 px-3 text-[12px] tracking-[0.08em] shadow-lg">
+                    {contentDraft.cta || "BOOK NOW"}
+                  </div>
+                </div>
+
+                <div className="text-center font-mono text-[9.5px] text-faint">
+                  Live preview updates automatically as you edit the fields.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

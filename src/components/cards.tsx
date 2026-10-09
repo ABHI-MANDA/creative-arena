@@ -51,11 +51,11 @@ export function PropertyCard({ card }: { card: PropertyCardT }) {
         <Link href={`/campaigns/new?property=${p.id}`} prefetch={true} className="btn-gold flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] font-semibold">
           Create Campaign <ArrowRight size={12} />
         </Link>
-        <Link href={`/campaigns/new?property=${p.id}&platforms=ig-reel`} prefetch={true} className="btn-ghost flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-gold">
-          <PlaySquare size={12.5} /> Generate Reel
+        <Link href={`/campaigns/new?property=${p.id}&platforms=9:16`} prefetch={true} className="btn-ghost flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-gold">
+          <PlaySquare size={12.5} /> Generate 9:16 Ad
         </Link>
-        <Link href={`/campaigns/new?property=${p.id}&platforms=ig-post,fb-ad,ig-story`} prefetch={true} className="btn-ghost col-span-2 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-mute">
-          <Share2 size={12.5} /> Generate Social Ads · Instagram + Facebook + Story
+        <Link href={`/campaigns/new?property=${p.id}&platforms=9:16,1:1,4:5,16:9`} prefetch={true} className="btn-ghost col-span-2 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-mute">
+          <Share2 size={12.5} /> Generate Ads · 9:16 + 1:1 + 4:5 + 16:9
         </Link>
       </div>
     </div>
@@ -91,7 +91,9 @@ export function CampaignRowCard({ row }: { row: CampaignRow }) {
           <Chip tone="gold">{c.presetLabel}</Chip>
           <span className="flex items-center gap-1.5 text-faint">
             {(c.platforms ?? []).slice(0, 5).map((pl) => (
-              <DynIcon key={pl} name={platformById(pl).icon} size={12.5} />
+              <span key={pl} className="font-mono text-[9.5px] font-bold text-gold/80">
+                {platformById(pl).aspect}
+              </span>
             ))}
           </span>
         </div>

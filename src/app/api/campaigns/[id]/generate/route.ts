@@ -9,6 +9,7 @@ import {
   hx,
   imageFor,
   tryLLMOverride,
+  type ApprovedAdContent,
   type Brief,
   type Img,
   type NewAsset,
@@ -37,6 +38,7 @@ async function tryAIImagePipeline({
   uploadedImages,
   thresholds,
   override,
+  approvedContent,
   enabledKinds,
   requestedModel,
 }: {
@@ -51,6 +53,7 @@ async function tryAIImagePipeline({
   uploadedImages: Img[];
   thresholds: { ready: number; review: number };
   override: Parameters<typeof composeAssets>[0]["override"];
+  approvedContent?: ApprovedAdContent | null;
   enabledKinds: string[] | undefined;
   requestedModel: string | null;
 }): Promise<NewAsset[] | null> {
@@ -68,6 +71,13 @@ async function tryAIImagePipeline({
       brief, dna as Parameters<typeof writeImagePrompts>[1], direction, visualKinds, requestedModel
     );
     console.log(`[ai-pipeline] Prompt writer: ${promptModel} (fallback=${promptFallback})`);
+
+    /* If user approved a custom image prompt during the review step, use it for visual generation */
+    if (approvedContent?.imagePrompt?.trim()) {
+      visualKinds.forEach((k) => {
+        prompts[k] = approvedContent.imagePrompt.trim();
+      });
+    }
 
     /* 3. Generate images in parallel — one per unique kind */
     /* Use square size for best compatibility across models */
@@ -128,6 +138,7 @@ async function tryAIImagePipeline({
       images: mergedImages,
       thresholds,
       override,
+      approvedContent,
       enabledKinds,
       variant: 10, // offset from 0 so AI variant is distinguishable
     });
@@ -140,7 +151,7 @@ async function tryAIImagePipeline({
         payload: {
           ...asset.payload,
           imageSource: (qi ? "ai-generated" : "uploaded") as "ai-generated" | "uploaded" | "sample",
-          imageGenPrompt: qi?.prompt,
+          imageGenPrompt: qi?.prompt ?? approvedContent?.imagePrompt,
           imageQualityScore: qi?.score ?? asset.score,
         },
       };
@@ -157,7 +168,11 @@ async function tryAIImagePipeline({
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const body = (await req.json().catch(() => ({}))) as { directionId?: string; model?: string };
+    const body = (await req.json().catch(() => ({}))) as {
+      directionId?: string;
+      model?: string;
+      approvedContent?: ApprovedAdContent;
+    };
     const bundle = await getCampaignBundle(id);
     if (!bundle) return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     if (!bundle.dna) return NextResponse.json({ error: "Run property analysis first." }, { status: 400 });
@@ -180,7 +195,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const direction = options.find((o) => o.id === body.directionId) ?? options[0];
 
     const started = Date.now();
-    const selection = body.model ?? await getAppSetting(`campaign-model:${id}`, "auto");
+    const selection = body.model ?? (await getAppSetting(`campaign-model:${id}`, "auto"));
     if (selection !== "auto" && !(await isFreeOpenRouterModel(selection))) {
       return NextResponse.json({ error: "Choose a currently available free text model, or use Automatic." }, { status: 400 });
     }
@@ -192,23 +207,45 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .map((template) => `${template.kind}: ${template.name}. ${template.instructions}`)
       .join("\n");
 
-    /* ---- LLM copy override (existing, unchanged) ---- */
-    const { override, model, fallback } = await tryLLMOverride(
-      brief,
-      bundle.dna as Parameters<typeof tryLLMOverride>[1],
-      bundle.campaign.preset,
-      requestedModel,
-      templateInstructions,
-      direction
-    );
-    await setAppSetting(`campaign-model:${id}`, model);
+    const approvedContent =
+      body.approvedContent ??
+      (await getAppSetting<ApprovedAdContent | null>(`campaign-draft-content:${id}`, null));
+    if (approvedContent) {
+      await setAppSetting(`campaign-approved-content:${id}`, approvedContent);
+    }
+
+    /* ---- LLM copy override ---- */
+    let override = null;
+    let model = "approved-content";
+    let fallback = false;
+
+    if (!approvedContent) {
+      const llmResult = await tryLLMOverride(
+        brief,
+        bundle.dna as Parameters<typeof tryLLMOverride>[1],
+        bundle.campaign.preset,
+        requestedModel,
+        templateInstructions,
+        direction
+      );
+      override = llmResult.override;
+      model = llmResult.model;
+      fallback = llmResult.fallback;
+      await setAppSetting(`campaign-model:${id}`, model);
+    }
 
     const uploadedImages = bundle.images.map((i) => ({ url: i.url, label: i.label }));
     const platformIds = bundle.campaign.platforms ?? [];
 
-    /* ---- NEW: try AI image pipeline first ---- */
-    const imageApiKey = process.env.IMAGE_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim();
-    const imageModel  = process.env.IMAGE_MODEL?.trim();
+    /* ---- AI Image Pipeline (Agnes AI / OpenRouter / FLUX) ---- */
+    const imageApiKey =
+      process.env.AGNES_API_KEY?.trim() ||
+      process.env.IMAGE_API_KEY?.trim() ||
+      process.env.OPENROUTER_API_KEY?.trim();
+    const imageModel =
+      process.env.AGNES_MODEL?.trim() ||
+      process.env.IMAGE_MODEL?.trim() ||
+      (process.env.AGNES_API_KEY?.trim() ? "agnes-image-2.5-flash" : "black-forest-labs/FLUX.1-schnell:free");
     let composed: NewAsset[] | null = null;
     let usedAIPipeline = false;
 
@@ -223,6 +260,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         uploadedImages,
         thresholds: brand.thresholds,
         override,
+        approvedContent,
         enabledKinds,
         requestedModel,
       });
@@ -233,7 +271,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         console.warn("[generate] AI image pipeline returned null — using existing approach.");
       }
     } else {
-      console.log("[generate] IMAGE_MODEL not configured — skipping AI image pipeline.");
+      console.log("[generate] No image API key or model configured — skipping AI image pipeline.");
     }
 
     /* ---- FALLBACK: existing deterministic approach ---- */
@@ -247,6 +285,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         images: uploadedImages,
         thresholds: brand.thresholds,
         override,
+        approvedContent,
         enabledKinds,
       });
       // Tag as uploaded source
@@ -302,7 +341,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     /* ---- Log generation actions ---- */
     const elapsed = Date.now() - started;
     const hasReel = composed.some((a) => a.kind === "reel");
-    const visualModel = usedAIPipeline ? (process.env.IMAGE_MODEL ?? "flux") : "local-ad-layout-v1";
+    const visualModel = usedAIPipeline ? (imageModel ?? "agnes-image-2.5-flash") : "local-ad-layout-v1";
     await logGeneration({ kind: "visual", model: visualModel, durationMs: 1200 + (hx(id) % 2400), costCents: 0, campaignId: id, propertyId: p.id });
     await logGeneration({ kind: "compose", model, durationMs: Math.max(400, elapsed), costCents: 6, campaignId: id, propertyId: p.id });
     if (hasReel) await logGeneration({ kind: "video-script", model, durationMs: Math.max(400, elapsed), costCents: 0, campaignId: id, propertyId: p.id });
@@ -322,7 +361,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       fallback,
       videoOutput: "storyboard-script",
       imagePipeline: usedAIPipeline ? "ai-generated" : "uploaded",
-      imageModel: usedAIPipeline ? process.env.IMAGE_MODEL : null,
+      imageModel: usedAIPipeline ? imageModel : null,
     });
   } catch (e) {
     console.error(e);

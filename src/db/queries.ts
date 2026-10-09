@@ -623,7 +623,7 @@ export async function getOverviewActivity() {
       if (isLocalJsonDb) {
         const generations = await listRecentGenerations(60);
         const recentGens = generations.slice(0, 7);
-        const referenceTime = generations[0] ? new Date(generations[0].createdAt).getTime() : 0;
+        const referenceTime = generations[0] ? new Date(generations[0].createdAt).getTime() : Date.now();
         const spark = Array.from({ length: 8 }, (_, i) => {
           const day = new Date(referenceTime - (7 - i) * 86400000);
           return generations.filter((generation) => new Date(generation.createdAt).toDateString() === day.toDateString()).length;

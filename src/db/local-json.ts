@@ -105,6 +105,16 @@ async function loadDatabase(): Promise<LocalJsonDatabase> {
     return normalizeDatabase(JSON.parse(await readFile(DATA_FILE, "utf8")));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return createEmptyDatabase();
+    if (error instanceof SyntaxError) {
+      console.error(`[local-json] Syntax error in ${DATA_FILE}. Backing up corrupted file and initializing clean database.`);
+      try {
+        const backupFile = `${DATA_FILE}.corrupted.${Date.now()}.bak`;
+        await rename(DATA_FILE, backupFile);
+      } catch {}
+      const empty = createEmptyDatabase();
+      await saveDatabase(empty);
+      return empty;
+    }
     throw error;
   }
 }

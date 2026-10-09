@@ -1,28 +1,44 @@
-/* Campaign presets, platform specs, ad-system config and the sample shot library. */
+/* Campaign presets, aspect ratio specifications, ad-system config and the sample shot library. */
 
 export type PlatformSpec = {
   id: string;
   label: string;
   short: string;
   aspect: string;
-  icon: string;
-  note: string;
+  icon?: string;
+  note?: string;
   video?: boolean;
 };
 
-export const PLATFORMS: PlatformSpec[] = [
-  { id: "ig-reel", label: "Instagram Reel", short: "Reel", aspect: "9:16", icon: "Instagram", note: "15–30s · hook first", video: true },
-  { id: "ig-post", label: "Instagram Post", short: "Post", aspect: "1:1", icon: "Instagram", note: "1:1 feed square" },
-  { id: "ig-story", label: "Instagram Story", short: "Story", aspect: "9:16", icon: "Instagram", note: "9:16 · CTA low" },
-  { id: "fb-ad", label: "Facebook Ad", short: "Facebook", aspect: "1:1", icon: "Facebook", note: "1:1 feed square" },
-  { id: "yt-short", label: "YouTube Short", short: "Short", aspect: "9:16", icon: "Youtube", note: "≤ 30s · 9:16", video: true },
-  { id: "linkedin", label: "LinkedIn", short: "LinkedIn", aspect: "1:1", icon: "Linkedin", note: "1:1 square" },
-  { id: "whatsapp", label: "WhatsApp", short: "WhatsApp", aspect: "1:1", icon: "MessageCircle", note: "1:1 · broadcast" },
-  { id: "portal", label: "Property Portal", short: "Portal", aspect: "1:1", icon: "Globe", note: "1:1 square" },
+export const ASPECT_RATIOS: PlatformSpec[] = [
+  { id: "9:16", label: "9:16", short: "9:16", aspect: "9:16", icon: "Smartphone", note: "9:16" },
+  { id: "1:1", label: "1:1", short: "1:1", aspect: "1:1", icon: "Square", note: "1:1" },
+  { id: "4:5", label: "4:5", short: "4:5", aspect: "4:5", icon: "RectangleVertical", note: "4:5" },
+  { id: "16:9", label: "16:9", short: "16:9", aspect: "16:9", icon: "RectangleHorizontal", note: "16:9" },
+  { id: "4:3", label: "4:3", short: "4:3", aspect: "4:3", icon: "Maximize", note: "4:3" },
+  { id: "3:2", label: "3:2", short: "3:2", aspect: "3:2", icon: "Camera", note: "3:2" },
+  { id: "2:3", label: "2:3", short: "2:3", aspect: "2:3", icon: "Grid", note: "2:3" },
+  { id: "21:9", label: "21:9", short: "21:9", aspect: "21:9", icon: "Tv", note: "21:9" },
 ];
 
-export const platformById = (id: string): PlatformSpec =>
-  PLATFORMS.find((p) => p.id === id) ?? PLATFORMS[1];
+export const PLATFORMS: PlatformSpec[] = ASPECT_RATIOS;
+
+export const platformById = (id: string): PlatformSpec => {
+  const match = ASPECT_RATIOS.find((p) => p.id === id || p.aspect === id);
+  if (match) return match;
+  const legacyToAspect: Record<string, string> = {
+    "ig-reel": "9:16",
+    "ig-story": "9:16",
+    "yt-short": "9:16",
+    "ig-post": "1:1",
+    "fb-ad": "1:1",
+    "linkedin": "16:9",
+    "whatsapp": "1:1",
+    "portal": "16:9",
+  };
+  const asp = legacyToAspect[id] || "1:1";
+  return ASPECT_RATIOS.find((p) => p.aspect === asp) ?? ASPECT_RATIOS[0];
+};
 
 export type Preset = {
   id: string;
@@ -34,16 +50,16 @@ export type Preset = {
 };
 
 export const PRESETS: Preset[] = [
-  { id: "luxury-property", label: "Luxury Property", icon: "Crown", desc: "Position the home as a rare, premium address.", objective: "Desire & brand positioning", defaultPlatforms: ["ig-post", "ig-reel", "ig-story", "linkedin"] },
-  { id: "project-launch", label: "Project Launch", icon: "Rocket", desc: "Announce the project to the market with impact.", objective: "Awareness & registrations", defaultPlatforms: ["ig-post", "fb-ad", "yt-short", "whatsapp"] },
-  { id: "new-phase-launch", label: "New Phase Launch", icon: "Layers", desc: "Open bookings for the next phase of the project.", objective: "Phase-II bookings", defaultPlatforms: ["ig-post", "fb-ad", "whatsapp"] },
-  { id: "property-sale", label: "Property Sale", icon: "BadgePercent", desc: "Drive enquiries, walkthroughs and site visits.", objective: "Lead generation", defaultPlatforms: ["ig-post", "fb-ad", "whatsapp", "portal"] },
-  { id: "rental", label: "Rental", icon: "KeyRound", desc: "Fill premium rentals fast with the right tenants.", objective: "Rental enquiries", defaultPlatforms: ["fb-ad", "whatsapp", "portal"] },
-  { id: "investment", label: "Investment", icon: "TrendingUp", desc: "ROI-led narrative for investor audiences.", objective: "Investor leads", defaultPlatforms: ["linkedin", "fb-ad", "portal"] },
-  { id: "open-house", label: "Open House", icon: "DoorOpen", desc: "Invite buyers to experience the home in person.", objective: "Event footfall", defaultPlatforms: ["ig-post", "ig-story", "whatsapp"] },
-  { id: "festival-offer", label: "Festival Offer", icon: "Sparkles", desc: "Festive season offers, tokens and waivers.", objective: "Time-boxed offers", defaultPlatforms: ["ig-post", "fb-ad", "whatsapp"] },
-  { id: "construction-progress", label: "Construction Progress", icon: "HardHat", desc: "Build trust with real, on-camera milestones.", objective: "Confidence & trust", defaultPlatforms: ["linkedin", "ig-reel", "fb-ad"] },
-  { id: "location-highlight", label: "Location Highlight", icon: "MapPin", desc: "Sell the neighbourhood, not just the home.", objective: "Location-led desire", defaultPlatforms: ["ig-reel", "ig-post", "portal"] },
+  { id: "luxury-property", label: "Luxury Property", icon: "Crown", desc: "Position the home as a rare, premium address.", objective: "Desire & brand positioning", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
+  { id: "project-launch", label: "Project Launch", icon: "Rocket", desc: "Announce the project to the market with impact.", objective: "Awareness & registrations", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
+  { id: "new-phase-launch", label: "New Phase Launch", icon: "Layers", desc: "Open bookings for the next phase of the project.", objective: "Phase-II bookings", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
+  { id: "property-sale", label: "Property Sale", icon: "BadgePercent", desc: "Drive enquiries, walkthroughs and site visits.", objective: "Lead generation", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
+  { id: "rental", label: "Rental", icon: "KeyRound", desc: "Fill premium rentals fast with the right tenants.", objective: "Rental enquiries", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
+  { id: "investment", label: "Investment", icon: "TrendingUp", desc: "ROI-led narrative for investor audiences.", objective: "Investor leads", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
+  { id: "open-house", label: "Open House", icon: "DoorOpen", desc: "Invite buyers to experience the home in person.", objective: "Event footfall", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
+  { id: "festival-offer", label: "Festival Offer", icon: "Sparkles", desc: "Festive season offers, tokens and waivers.", objective: "Time-boxed offers", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
+  { id: "construction-progress", label: "Construction Progress", icon: "HardHat", desc: "Build trust with real, on-camera milestones.", objective: "Confidence & trust", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
+  { id: "location-highlight", label: "Location Highlight", icon: "MapPin", desc: "Sell the neighbourhood, not just the home.", objective: "Location-led desire", defaultPlatforms: ["9:16", "1:1", "4:5", "16:9"] },
 ];
 
 export const presetById = (id: string): Preset =>
@@ -51,25 +67,33 @@ export const presetById = (id: string): Preset =>
 
 /* Which ad templates each platform receives */
 export const PLATFORM_KINDS: Record<string, string[]> = {
-  "ig-post": ["hero", "feature", "location", "lifestyle", "offer"],
-  "ig-story": ["story", "offer"],
-  "ig-reel": ["reel"],
-  "fb-ad": ["hero", "offer", "location"],
-  "yt-short": ["reel"],
-  linkedin: ["hero", "feature"],
-  whatsapp: ["offer", "story"],
-  portal: ["hero", "feature", "location"],
+  "9:16": ["hero"],
+  "1:1": ["hero"],
+  "4:5": ["hero"],
+  "16:9": ["hero"],
+  "4:3": ["hero"],
+  "3:2": ["hero"],
+  "2:3": ["hero"],
+  "21:9": ["hero"],
+  "ig-post": ["hero"],
+  "ig-story": ["hero"],
+  "ig-reel": ["hero"],
+  "fb-ad": ["hero"],
+  "yt-short": ["hero"],
+  linkedin: ["hero"],
+  whatsapp: ["hero"],
+  portal: ["hero"],
 };
 
 export const KIND_LABELS: Record<string, string> = {
-  hero: "Hero Ad",
-  feature: "Feature Ad",
-  location: "Location Ad",
-  offer: "Offer Ad",
-  lifestyle: "Lifestyle Ad",
-  story: "Story Frame",
-  reel: "Reel Sequence",
-  copy: "Copy Pack",
+  hero: "Ad Post",
+  feature: "Ad Post",
+  location: "Ad Post",
+  offer: "Ad Post",
+  lifestyle: "Ad Post",
+  story: "Ad Post",
+  reel: "Ad Post",
+  copy: "Ad Post",
 };
 
 export const KIND_BLURBS: Record<string, string> = {

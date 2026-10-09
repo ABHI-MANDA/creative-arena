@@ -45,20 +45,16 @@ export function AssetLibrary({
   initialProperty: string;
 }) {
   const router = useRouter();
-  const [platform, setPlatform] = useState("all");
-  const [kind, setKind] = useState("all");
+  const [aspect, setAspect] = useState("all");
   const [status, setStatus] = useState("all");
   const [editingItem, setEditingItem] = useState<Item | null>(null);
 
-  const platforms = useMemo(() => ["all", ...new Set(items.filter((i) => !initialProperty || i.propertyId === initialProperty).map((i) => i.platform))], [items, initialProperty]);
-  const kinds = useMemo(() => ["all", ...new Set(items.map((i) => i.kind))], [items]);
-
+  const aspects = useMemo(() => ["all", ...new Set(items.map((i) => i.aspect))], [items]);
   const scoped = initialProperty ? items.filter((i) => i.propertyId === initialProperty) : items;
 
   const filtered = scoped.filter(
     (i) =>
-      (platform === "all" || i.platform === platform) &&
-      (kind === "all" || i.kind === kind) &&
+      (aspect === "all" || i.aspect === aspect) &&
       (status === "all" || (status === "approved" ? i.approved : i.status === status))
   );
 
@@ -113,12 +109,8 @@ export function AssetLibrary({
         <>
           <div className="anim-up mb-6 space-y-3 rounded-2xl">
             <div className="flex items-center gap-3">
-              <span className="w-16 font-mono text-[9.5px] uppercase tracking-[0.2em] text-faint">Platform</span>
-              <Select value={platform} set={setPlatform} opts={platforms} fmt={(v) => (v === "all" ? "All" : platformById(v).short)} />
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="w-16 font-mono text-[9.5px] uppercase tracking-[0.2em] text-faint">Format</span>
-              <Select value={kind} set={setKind} opts={kinds} fmt={(v) => (v === "all" ? "All" : KIND_LABELS[v] ?? v)} />
+              <span className="w-16 font-mono text-[9.5px] uppercase tracking-[0.2em] text-faint">Ratio</span>
+              <Select value={aspect} set={setAspect} opts={aspects} fmt={(v) => (v === "all" ? "All" : v)} />
             </div>
             <div className="flex items-center gap-3">
               <span className="w-16 font-mono text-[9.5px] uppercase tracking-[0.2em] text-faint">Status</span>
@@ -138,11 +130,8 @@ export function AssetLibrary({
                 {/* TOP TOOLBAR HEADER */}
                 <div className="border-b border-line bg-panel/90 px-3.5 py-3 backdrop-blur space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-widest text-faint">
-                      <span className={i.platform === "multi" ? "text-gold" : "text-mute"}>
-                        <DynIcon name={i.platform === "multi" ? "Sparkles" : platformById(i.platform).icon} size={11.5} />
-                      </span>
-                      {KIND_LABELS[i.kind] ?? i.kind} · {i.aspect}
+                    <span className="font-mono text-[11px] font-bold text-gold">
+                      {i.aspect}
                     </span>
                     <span className={cx(
                       "flex items-center gap-1 font-mono text-[10px]",

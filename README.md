@@ -1,92 +1,174 @@
 # M & A — AI Real Estate Creative Studio
 
-> **AI Real Estate Creative Agent** — turn property photos, listing web links, and plain-language briefs into professional, QC-scored, ready-to-publish property campaigns.
+> **AI-Powered Real Estate Creative Studio** — Transform property photos, listing URLs, and briefs into photorealistic, typography-composed, ready-to-publish property marketing campaigns with full user approval and in-browser design editing.
 >
-> 🌐 **Live Website**: (https://creativearena.netlify.app/)
+> 🌐 **Live Website**: [https://creativearena.netlify.app/](https://creativearena.netlify.app/)  
+> 🐳 **Docker Hub / Production Image**: `creative-arena:latest` (~83 MB standalone)
 
-M & A is brief-driven, not prompt-driven. Marketing teams onboard a property via **web link scraping**, photo upload, or plain-language brief; the platform extracts a project's **Creative DNA**, proposes **3 creative directions**, composes a full multi-platform **ad system** (Hero / Feature / Location / Offer / Lifestyle / Story / Reel storyboard), runs an **11-point Brand Quality Check**, and ships a downloadable **ready-to-post campaign package**.
+M & A is brief-driven, not prompt-driven. Marketing teams onboard a property via **live web link scraping**, photo upload, or structured brief. The platform analyzes the property's **Creative DNA**, proposes **3 creative directions**, generates high-fidelity photorealistic architecture via **Agnes AI / FLUX**, halts for a **Content Review & Approval Stage**, allows in-browser graphic editing via **Fabric.js**, verifies compliance with an **11-point Brand Quality Check**, and exports a downloadable **high-resolution campaign package** across **8 distinct aspect ratios**.
 
 ---
 
 ## Table of Contents
 
 - [Live Application](#live-application)
-- [Recent Upgrades & Key Features](#recent-upgrades--key-features)
-- [Feature Overview](#feature-overview)
+- [System Architecture](#system-architecture)
+- [Key Features & Recent Upgrades](#key-features--recent-upgrades)
+- [Multi-Platform Aspect Ratio Support](#multi-platform-aspect-ratio-support)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
-- [Quick Start (TL;DR)](#quick-start-tldr)
-- [Full Setup Guide](#full-setup-guide)
-  - [1. Database options](#1-database-options)
-  - [2. Environment variables](#2-environment-variables)
-  - [3. Install & migrate](#3-install--migrate)
-  - [4. Run the app](#4-run-the-app)
-  - [5. Optional AI provider (OpenRouter)](#5-optional-ai-provider-openrouter)
-- [Quick Start with VS Code](#quick-start-with-vs-code)
-- [Available Commands](#available-commands)
-- [Application Map](#application-map)
-- [Deployment Guide](#deployment-guide)
-  - [A. Netlify (Live Production Host)](#a-netlify-live-production-host)
-  - [B. Vercel + Neon (recommended)](#b-vercel--neon-recommended)
-  - [C. Railway / Render](#c-railway--render)
-  - [D. Docker (self-hosted)](#d-docker-self-hosted)
-  - [Production checklist](#production-checklist)
-- [Resetting Demo Data](#resetting-demo-data)
-- [Troubleshooting](#troubleshooting)
+- [Quick Start Guide](#quick-start-guide)
+  - [Option A: Local Development (Fastest)](#option-a-local-development-fastest)
+  - [Option B: Docker Compose (One-Command)](#option-b-docker-compose-one-command)
+  - [Option C: Manual Docker CLI](#option-c-manual-docker-cli)
+- [Environment Variables](#environment-variables)
+- [Available Commands Reference](#available-commands-reference)
+- [Database & Storage Modes](#database--storage-modes)
+- [AI Models & Provider Setup](#ai-models--provider-setup)
+- [Deployment Guides](#deployment-guides)
+  - [1. Docker (Recommended Self-Hosted)](#1-docker-recommended-self-hosted)
+  - [2. Netlify (Live Production Host)](#2-netlify-live-production-host)
+  - [3. Vercel + Neon PostgreSQL](#3-vercel--neon-postgresql)
+- [Troubleshooting & FAQ](#troubleshooting--faq)
+- [Documentation Index](#documentation-index)
 
 ---
 
 ## Live Application
 
-The production application is deployed and live at:
+The production application is continuously deployed and live at:  
 🔗 **[https://creativearena.netlify.app/](https://creativearena.netlify.app/)**
 
 ---
 
-## Recent Upgrades & Key Features
+## System Architecture
 
-- 🚀 **Live Web Link Scraper (`/api/properties/scrape`)**: Add properties simply by pasting listing web URLs. The intelligent scraper automatically extracts structured property briefs, location, pricing, amenities, and high-resolution property imagery.
-- 📐 **1:1 Square Feed Default**: All post formats default to clean 1:1 square aspect ratios fitting frames seamlessly (`object-fit: cover`) for Instagram, Facebook, and LinkedIn feeds.
-- 🖼️ **Ready-to-Post Images (Zero System Watermarks)**: Removed all internal system badges, M & A logos, top-left brand text, approval stamps, and ratio tags from exported creatives. Downloaded ads are 100% clean and commercially usable.
-- 📸 **High-Definition DOM & Canvas Export Engine (`renderAssetDOMToBlob`)**: Exports exact 1080p high-resolution ad posts preserving full background property photos with **zero black margins, zero black sidebars, and zero empty space**.
-- 🔒 **Server-Side Image Proxy (`/api/proxy-image`)**: Proxy route for fetching external, scraped, or stock property images without CORS restrictions or canvas tainting.
-- ⚡ **Dual DB Engine Resilience**: Automatic fallback to local JSON database mode if `DATABASE_URL` is unconfigured or PostgreSQL connections drop during serverless cold-starts, preventing production SSR errors (`ERROR 3128256750`).
+```mermaid
+flowchart TD
+    subgraph Onboarding["1. Property Onboarding"]
+        URL["Listing URL Scraping\n(/api/properties/scrape)"]
+        Manual["Photo Upload &\nCreative Brief"]
+        DNA["Creative DNA Extraction\n(Architecture, Palette, USPs)"]
+        URL --> DNA
+        Manual --> DNA
+    end
+
+    subgraph Planning["2. Campaign Planning"]
+        Preset["Campaign Preset\n(Luxury, Launch, Phase, Offer)"]
+        Ratios["8 Aspect Ratios\n(9:16, 1:1, 4:5, 16:9, etc.)"]
+        Directions["3 Creative Directions\n(Cinema, Living, Structure)"]
+        DNA --> Preset --> Ratios --> Directions
+    end
+
+    subgraph Approval["3. Review & Approval Stage (PAUSE)"]
+        DraftContent["Draft Copy & Image Prompt\n(/api/campaigns/{id}/prepare-content)"]
+        ReviewUI["Interactive Review Modal\n(Developer, Project, Tagline, BHK, Amenities, Price, CTA)"]
+        LiveMock["Real-Time Visual Mock Preview"]
+        Directions --> DraftContent --> ReviewUI
+        ReviewUI <--> LiveMock
+    end
+
+    subgraph Generation["4. High-Fidelity Generation"]
+        AgnesAI["Agnes AI / FLUX Imagery\n(Negative filtered, zero text in raw photo)"]
+        DesignEngine["Typography & Layout Engine\n('BOOK NOW' CTA, safe zones, cqw units)"]
+        ReviewUI -->|User Approval| AgnesAI
+        ReviewUI -->|User Approval| DesignEngine
+    end
+
+    subgraph Refinement["5. Editing & Export"]
+        FabricEditor["Fabric.js Canvas Editor\n(Move, scale, restyle layers)"]
+        QC["11-Point Brand Quality Check"]
+        Export["High-Res Export Engine\n(PNG, JPEG, ZIP Package)"]
+        AgnesAI & DesignEngine --> QC
+        QC --> FabricEditor
+        QC --> Export
+        FabricEditor --> Export
+    end
+```
 
 ---
 
-## Feature Overview
+## Key Features & Recent Upgrades
 
-| Area | What it does |
-| --- | --- |
-| **Property Onboarding** | Bring a property in via **web link scraping**, photo upload, or sample library. A plain-language **Creative Brief** replaces complex prompt engineering. |
-| **Creative DNA** | Vision pass extracts architecture, palette, lighting, audience, positioning, USPs, features and location advantages. Every asset inherits it. |
-| **Campaign Presets** | 10 one-click presets: Luxury Property, Project Launch, New Phase, Sale, Rental, Investment, Open House, Festival Offer, Construction Progress, Location Highlight. |
-| **Platform-first Generation** | Instagram Reel / Post / Story, Facebook, YouTube Short, LinkedIn, WhatsApp, Property Portal — aspect ratio, safe zones and composition are chosen automatically. |
-| **3 Creative Directions** | Before anything is generated, M & A proposes 3 concepts (Golden Hour Cinema, Bright Living, Form & Structure) with palettes, grade and music direction. |
-| **Reference-guided Ad System** | Reference images guide still ad imagery; the design engine adds editable headline, price, CTA, typography, and safe zones. |
-| **Reel Storyboard** | 15s / 30s shot-by-shot scripts: Hook → Exterior → Interior → Amenities → (Lifestyle/USP) → CTA, with transitions, captions and music. |
-| **Brand Ad Quality Check** | 11-point QC sweep per asset with score ring. Configurable thresholds in the Brand Kit. |
-| **Before → After Studio** | Draggable comparison slider: Original → AI Enhanced → Final Ad. |
-| **Ready-to-Post Package** | Export still ads as high-res PNG/JPEG and download a campaign ZIP package with rendered frames, manifest, captions, hashtags, and reel storyboard JSON. |
-| **Admin Console** | Users, campaigns, generations, AI cost, failures, storage, API usage, provider health, and per-model performance telemetry. |
+### 1. In-Browser Graphic Editor (`CreativeEditorModal` & Fabric.js v7)
+- **Direct Canvas Editing**: Click **"Edit Creative"** on any visual asset to launch the full-featured Fabric.js vector canvas editor.
+- **Layer Controls**: Drag, scale, re-order, restyle, change typography, adjust colors, and modify background images directly in the browser.
+- **Non-Destructive Save**: Updates persist directly to the campaign asset payload without server re-generation.
+
+### 2. Content Review & Approval Stage in the Generation Pipeline
+- **Pipeline Halts for User Review**: Before rendering final creatives or executing AI image prompts, the pipeline generates a structured draft copy via [`/api/campaigns/{id}/prepare-content`](file:///src/app/api/campaigns/[id]/prepare-content/route.ts) and pauses for approval.
+- **Editable Ad Typography**: Review and correct:
+  - **Developer / Brand Name** (e.g. *Sobha Realty*)
+  - **Project Name / Headline** (e.g. *Sobha Verde*)
+  - **Tagline / Hook** (e.g. *Where Luxury Meets Nature*)
+  - **Configuration / BHK Highlight** (e.g. *3 & 4 BHK*)
+  - **Typology & Location Tag** (e.g. *Luxury Residences in Sector 102*)
+  - **Key Amenities Line** (pipe-separated highlights)
+  - **Starting Price Tag** (e.g. *₹ 1.85 Cr* Onwards*)
+  - **CTA Button Text** (defaulting to `"BOOK NOW"`)
+  - **AI Visual Prompt** (customized architectural prompt sent to Agnes AI / FLUX)
+- **Live Interactive Mock Preview**: Live card updates in real time as fields are edited.
+- **In-Workspace Modal**: Re-review and re-generate existing campaigns at any time via the workspace header.
+
+### 3. Removal of Dummy Phone Numbers & Defaulting to "BOOK NOW"
+- **Zero Dummy Numbers**: Eradicated all hardcoded `Call to : 1234567890` fallbacks across visual templates, DOM exporters, and canvas adapters.
+- **Clean Action CTA**: All buttons and call bars default to **`"BOOK NOW"`** or user-approved custom action copy.
+
+### 4. Removal of Aero Signs, Studio Watermarks & Series Names
+- Eliminated aero signs (`↗`), `"ma-arena.studio"` text, and series label watermarks from all visual deliverables.
+- Creatives are 100% clean, pristine, and ready for commercial posting.
+
+### 5. Agnes AI & OpenRouter Integration for Architectural Imagery
+- **Agnes AI Engine**: Integrates `agnes-image-2.5-flash` for ultra-fast, photorealistic luxury architectural photography.
+- **Intelligent Prompt Engineering**: [`src/lib/creative/image-prompt-writer.ts`](file:///src/lib/creative/image-prompt-writer.ts) adds negative prompt constraints (zero overlaid text, clean skies, realistic textures, natural lighting).
+- **Graceful Fallbacks**: Automatic fallback to OpenRouter FLUX.1 (`FLUX.1-schnell:free` / `FLUX.1-dev:free`) or Pollinations FLUX.
+- **Text & Copy Models**: Support for OpenRouter flagship (`openai/gpt-4o`) and free models (`nvidia/nemotron-3-super-120b-a12b:free`, `openrouter/free`).
+
+### 6. Database Storage & Network Egress Optimization
+- **In-Memory LRU Caching**: Added high-efficiency cache layer ([`src/lib/cache.ts`](file:///src/lib/cache.ts)) for frequent database queries (`brand:settings`, `dashboard:stats`, `properties:list`), drastically reducing Neon compute hours (CU-hrs) and network transfer egress.
+- **Observability Telemetry**: Tracks request counts, compute durations, and estimated egress in `/api/health` and `/api/admin/report`.
+
+### 7. Production Docker Containerization (~83 MB Standalone)
+- **Next.js Standalone Mode**: Enabled `output: "standalone"` in `next.config.ts`.
+- **Multi-Stage Build**: Alpine Linux (`node:22-alpine`) with unprivileged non-root user (`nextjs:1001`).
+- **One-Command Orchestration**: Includes `docker-compose.yml` with persistent volume support (`.local-db`).
+
+---
+
+## Multi-Platform Aspect Ratio Support
+
+All aspect ratios are presented cleanly **by ratio only** (no platform or format names):
+
+| Aspect Ratio | CSS Dimensions | Typical Output Resolution | Ideal Use Case |
+|---|---|---|---|
+| **9:16** | `9 / 16` | 1080 × 1920 px | Full-screen vertical stories, reels, shorts |
+| **1:1** | `1 / 1` | 1080 × 1080 px | Square grid feeds (Instagram, Facebook, LinkedIn) |
+| **4:5** | `4 / 5` | 1080 × 1350 px | Portrait feed ads with maximum screen real-estate |
+| **16:9** | `16 / 9` | 1920 × 1080 px | Horizontal widescreen video, YouTube, website banners |
+| **1.91:1** | `1.91 / 1` | 1200 × 628 px | Standard landscape link previews and display banners |
+| **4:3** | `4 / 3` | 1440 × 1080 px | Classic display, tablet viewing, print cards |
+| **3:4** | `3 / 4` | 1080 × 1440 px | Vertical tablet presentation and catalog listings |
+| **2:3** | `2 / 3` | 1080 × 1620 px | High-fashion portrait format, Pinterest pins |
 
 ---
 
 ## Tech Stack
 
-| Layer | Choice |
-| --- | --- |
-| Framework | **Next.js 16** (App Router, Turbopack) |
-| Language | TypeScript (strict) |
-| Database | **PostgreSQL** via **Drizzle ORM** (`pg` driver) + Local JSON Fallback |
-| Image Proxy | Server-side CORS Proxy (`/api/proxy-image`) |
-| Scraper | Web Scraper Engine (`/api/properties/scrape`) |
-| Export Engine | `html-to-image` + Canvas 2D DOM Snapshot Engine |
-| Styling | **Tailwind CSS v4** + custom design system (`globals.css`) |
-| Fonts | Fraunces (display), Inter (sans), IBM Plex Mono — via `next/font` |
-| Icons | `lucide-react` |
-| AI Provider | **OpenRouter** (GPT-4o-Mini for copy & prompt intelligence, GPT-Image-2 for photography) |
+| Layer | Technology | Details |
+|---|---|---|
+| **Framework** | **Next.js 16.2.6** | App Router, React 19, Turbopack, Standalone Output |
+| **Language** | **TypeScript 5.9** | Strict mode, full type-safety |
+| **Graphic Editor** | **Fabric.js v7** | In-browser canvas manipulation, vector scaling, layer editing |
+| **Database** | **PostgreSQL + Drizzle ORM** | `pg` driver + automatic Local JSON fallback (`.local-db`) |
+| **Caching** | **In-Memory LRU Cache** | Sub-millisecond reads, Neon compute & egress optimizer |
+| **Image AI** | **Agnes AI & FLUX** | `agnes-image-2.5-flash`, `FLUX.1-schnell:free` |
+| **Text AI** | **OpenRouter** | `openai/gpt-4o`, `openai/gpt-4o-mini`, `openrouter/free` |
+| **Web Scraper** | **Cheerio** | Server-side DOM parser for listing URLs |
+| **Image Proxy** | **Server-side CORS Proxy** | `/api/proxy-image` prevents canvas tainting |
+| **Export Engine** | **HTML5 Canvas 2D + JSZip** | Client-side 1080p DOM snapshot rendering & ZIP packaging |
+| **Styling** | **Tailwind CSS v4** | Container query units (`cqw`), Fraunces, Inter, IBM Plex Mono |
+| **Container** | **Docker & Docker Compose** | Multi-stage build, Alpine Node 22, ~83 MB content size |
 
 ---
 
@@ -94,139 +176,245 @@ The production application is deployed and live at:
 
 ```
 .
-├── public/images/props/          # AI-generated sample property photography
-├── src
-│   ├── app
-│   │   ├── page.tsx              # Studio Overview (dashboard)
-│   │   ├── layout.tsx            # Fonts + app shell mount
-│   │   ├── globals.css           # Theme tokens, ad typography (cqw), motion
-│   │   ├── properties/           # List · new (wizard) · [id] (DNA, Before→After)
-│   │   ├── campaigns/            # List · new (preset → platforms → directions) · [id] (workspace)
-│   │   ├── assets/               # Filterable ad library
-│   │   ├── templates/            # Ad system & preset gallery
-│   │   ├── brand/                # Brand Kit & QC thresholds
-│   │   ├── admin/                # Operations & model intelligence console
-│   │   └── api/                  # properties, scrape, campaigns, generate, assets, proxy-image, health
-│   ├── components/               # Shell, ad renderer, pipeline, storyboard, QC, before/after…
-│   ├── db
-│   │   ├── schema.ts             # Drizzle tables
-│   │   ├── queries.ts            # Typed data access + resilient fallback telemetry
-│   │   ├── seed.ts               # Idempotent demo auto-seed
-│   │   └── index.ts              # pg Pool + drizzle client + SSL pool handling
-│   └── lib
-│       ├── utils.ts
+├── Dockerfile                        # Multi-stage production Docker build (~83 MB)
+├── docker-compose.yml                # Docker Compose orchestration with volume persistence
+├── .dockerignore                     # Build context exclusions (prevents secret leakage)
+├── next.config.ts                    # Next.js config with standalone output enabled
+├── package.json                      # Dependencies and npm scripts
+├── drizzle.config.ts                 # Drizzle Kit schema and database configuration
+├── .env.example                      # Complete environment variable template
+├── public/                           # Static assets, fonts, icons, sample photography
+├── src/
+│   ├── app/
+│   │   ├── page.tsx                  # Studio Overview (Dashboard & Activity)
+│   │   ├── layout.tsx                # Fonts, theme providers, app shell
+│   │   ├── globals.css               # Design system tokens, cqw typography rules
+│   │   ├── properties/               # Property management & web scraping wizard
+│   │   ├── campaigns/                # 3-stage campaign creator & workspace
+│   │   │   ├── new/page.tsx          # Brief -> Direction -> Content Review & Approval
+│   │   │   └── [id]/workspace.tsx    # Live workspace, export suite, in-workspace review modal
+│   │   ├── assets/                   # Searchable & filterable asset library
+│   │   ├── templates/                # Ad design presets & aspect ratio catalog
+│   │   ├── brand/                    # Brand settings, color palette & 11-point QC kit
+│   │   ├── admin/                    # Observability, compute telemetry & CSV report
+│   │   └── api/                      # Full suite of RESTful API route handlers
+│   │       ├── health/               # Database connectivity & egress telemetry
+│   │       ├── properties/           # CRUD & DNA re-analysis
+│   │       ├── properties/scrape/    # Listing URL web scraper
+│   │       ├── proxy-image/          # Server-side CORS proxy
+│   │       ├── campaigns/            # Campaign planning & generation
+│   │       ├── campaigns/[id]/prepare-content/ # Content drafting for review stage
+│   │       ├── image-models/         # Supported Agnes AI & FLUX image models
+│   │       └── models/               # Supported OpenRouter text models
+│   ├── components/                   # UI components, layout shell, cards, modals
+│   │   ├── ad-creative.tsx           # Multi-aspect visual ad post rendering engine
+│   │   ├── editor/                   # CreativeEditorModal with Fabric.js adapter
+│   │   ├── campaigns/                # ReviewContentModal for approval workflow
+│   │   └── pipeline.tsx              # Generation progress overlay
+│   ├── db/
+│   │   ├── schema.ts                 # Drizzle ORM table definitions
+│   │   ├── queries.ts                # Data access layer with cache integration
+│   │   ├── seed.ts                   # Idempotent demo auto-seeder
+│   │   ├── local-json.ts             # Atomic JSON file database engine
+│   │   └── index.ts                  # Dual-engine connection pool manager
+│   └── lib/
+│       ├── cache.ts                  # In-memory LRU cache (Neon compute saver)
+│       ├── observability.ts          # Egress, CU-hr and latency tracking
 │       └── creative/
-│           ├── presets.ts        # Platforms, presets, brand defaults, QC checklist
-│           ├── engine.ts         # Creative Intelligence Engine (DNA, directions,
-│           │                     #   composer, storyboards, captions, QC scoring)
-│           └── image-provider.ts # OpenRouter image generation and reference guidance
-├── drizzle.config.ts
-├── .env                          # DATABASE_URL (never commit real secrets)
-└── package.json
+│           ├── engine.ts             # Core creative intelligence, copy composer, QC rules
+│           ├── presets.ts            # 8 aspect ratios, brand defaults, direction templates
+│           ├── image-provider.ts     # Agnes AI & FLUX image generation client
+│           ├── image-prompt-writer.ts# Architectural prompt engineering & negative filters
+│           └── models.ts             # OpenRouter model resolver & fallback chains
+├── README.md                         # Main project overview (this file)
+├── README-API.md                     # Comprehensive HTTP API documentation
+├── README-DB.md                      # Database architecture & optimization guide
+├── README-DOCKER.md                  # Detailed Docker container deployment guide
+├── README-PROD.md                    # Production hosting & operational checklist
+└── CHANGELOG.md                      # Detailed release history
 ```
 
 ---
 
 ## Prerequisites
 
-- **Node.js 20+** (LTS recommended) — check with `node -v`
-- **npm 10+**
-- **PostgreSQL 14+** — local install, Docker, or managed instance (Neon/Supabase/Railway)
-- **VS Code** (for the guided setup below)
+- **Node.js**: v20.x or v22.x LTS (tested up to v24.x)
+- **Package Manager**: `npm` v10+
+- **Docker**: (Optional) Docker Desktop v24+ with Compose v2+
+- **Database**: PostgreSQL 14+ (or use the built-in local JSON database — no external DB needed!)
 
 ---
 
-## Quick Start (TL;DR)
+## Quick Start Guide
 
-For **Windows PowerShell**, run these commands from the project folder. Local development defaults
-to a JSON database at `.local-db/database.json`, so PostgreSQL and Docker are not needed for preview.
+### Option A: Local Development (Fastest)
 
-```powershell
-# Install dependencies and create .env without overwriting an existing file
-cmd /c npm install
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-
-# Start the local preview
-cmd /c npm run dev
-```
-
-Open **http://localhost:3000** in your browser. The first request seeds the demo properties,
-campaigns, and telemetry. Leave the terminal running while previewing; press **Ctrl+C** to stop.
-
----
-
-## Full Setup Guide
-
-### 1. Database options
-
-Pick one:
-
-**Option A — Local JSON File DB (fastest, no Postgres needed)**
-Leave `LOCAL_JSON_DB=true` in `.env`.
-
-**Option B — Managed PostgreSQL (Neon, free tier)**
-1. Create a project at [neon.tech](https://neon.tech).
-2. Copy the connection string (pooled URI).
-3. Set `DATABASE_URL` in `.env`.
-
-### 2. Environment variables
-
-Create a `.env` file at the project root:
+The application includes an embedded local JSON database engine (`.local-db/database.json`), allowing instant startup without provisioning PostgreSQL or Docker.
 
 ```bash
-# required for PostgreSQL mode (falls back to local JSON if omitted)
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/app_db
+# 1. Install dependencies
+npm install
 
-# optional — hosted AI copy & image generation via OpenRouter
-OPENROUTER_API_KEY=
-OPENROUTER_MODEL=openai/gpt-4o-mini
+# 2. Setup environment variables
+cp .env.example .env
 
-# optional OpenRouter image endpoint/model overrides
-IMAGE_API_BASE_URL=https://openrouter.ai/api/v1
-IMAGE_API_KEY=
-IMAGE_MODEL=openai/gpt-image-2
+# 3. Start development server
+npm run dev
+```
+
+Open **http://localhost:3000** in your browser. The initial request auto-seeds sample properties and campaigns.
+
+> **Windows PowerShell Tip:** If npm script execution is restricted by PowerShell policies, run via `cmd.exe`:
+> ```powershell
+> cmd /c npm install
+> cmd /c npm run dev
+> ```
+
+---
+
+### Option B: Docker Compose (One-Command)
+
+Run the fully isolated production container with persistent volume storage in one command:
+
+```bash
+# 1. Ensure .env is populated with any desired AI keys
+cp .env.example .env
+
+# 2. Build and start the container
+docker compose up -d --build
+
+# 3. View live logs
+docker compose logs -f
+```
+
+Open **http://localhost:3000**. All created campaigns persist in the Docker volume `creative-arena-data`.
+
+To stop the container:
+```bash
+docker compose down
 ```
 
 ---
 
-## Deployment Guide
+### Option C: Manual Docker CLI
 
-### A. Netlify (Live Production Host)
+```bash
+# 1. Build the lightweight production image (~83 MB)
+docker build -t creative-arena:latest .
 
-The application is configured for Netlify deployment via `@netlify/plugin-nextjs`.
-
-1. **Push code to GitHub repository**:
-   ```bash
-   git add .
-   git commit -m "Update application"
-   git push origin main
-   ```
-2. **Connect Repository to Netlify**:
-   - Framework preset: **Next.js**
-   - Build command: `npm run build`
-   - Publish directory: `.next`
-3. **Set Environment Variables in Netlify**:
-   - `DATABASE_URL` (Neon PostgreSQL pooled string)
-   - `OPENROUTER_API_KEY` (OpenRouter API key)
-   - `OPENROUTER_MODEL` (`openai/gpt-4o-mini`)
-   - `SECRETS_SCAN_OMIT_KEYS` (`IMAGE_API_BASE_URL,IMAGE_MODEL,OPENROUTER_MODEL`)
-
-### B. Vercel + Neon (recommended)
-
-1. Import GitHub repository into Vercel.
-2. Add `DATABASE_URL` and `OPENROUTER_API_KEY` to Vercel environment settings.
-3. Push database schema via `npx drizzle-kit push`.
+# 2. Run container with local JSON storage volume
+docker run -d \
+  --name creative-arena-app \
+  -p 3000:3000 \
+  --env-file .env \
+  -v creative-arena-data:/app/.local-db \
+  creative-arena:latest
+```
 
 ---
 
-## Troubleshooting
+## Environment Variables
 
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| `ERROR 3128256750` on server render | Missing DB env var or connection drop | Add `DATABASE_URL` or let `isLocalJsonDb` fallback run automatically. |
-| Canvas export stripped photo | SVG foreignObject security restriction | Handled automatically via `/api/proxy-image` and `renderAssetDOMToBlob`. |
-| Black margins on download | Render canvas mismatch | Handled automatically — export engine scales to 100% full-bleed aspect ratio. |
-| Web scraping URL returns 500 | Target site anti-bot | Paste manual property brief fields in wizard fallback. |
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `LOCAL_JSON_DB` | Optional | `true` | When `true`, uses the embedded atomic file database (`.local-db`). |
+| `DATABASE_URL` | Optional | *None* | PostgreSQL URI (e.g. Neon connection string). When omitted, auto-falls back to JSON mode. |
+| `OPENROUTER_API_KEY` | Optional | *None* | OpenRouter API key for automated copywriting and prompt intelligence. |
+| `OPENROUTER_MODEL` | Optional | `openai/gpt-4o` | Model used for copywriting. Supports `openai/gpt-4o-mini`, `openrouter/free`, etc. |
+| `AGNES_API_KEY` | Optional | *None* | Agnes AI API key for photorealistic architectural imagery generation. |
+| `AGNES_BASE_URL` | Optional | `https://apihub.agnes-ai.com/v1` | Agnes AI API endpoint URL. |
+| `AGNES_MODEL` | Optional | `agnes-image-2.5-flash` | Agnes AI model variant (`agnes-image-2.5-flash` or `2.1-flash`). |
+| `IMAGE_API_BASE_URL` | Optional | *None* | Alternative image generation provider base URL (e.g., FLUX.1). |
+| `IMAGE_API_KEY` | Optional | *None* | Key for alternative image provider. |
+| `IMAGE_MODEL` | Optional | *None* | Model slug for alternative image provider. |
+
+---
+
+## Available Commands Reference
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Starts local Next.js development server with Turbopack on port 3000. |
+| `npm run build` | Compiles optimized production build with standalone output (`.next/standalone`). |
+| `npm run start` | Runs the compiled production build locally. |
+| `npm run typecheck` | Runs TypeScript compiler verification (`tsc --noEmit`) with 0 errors. |
+| `npm run lint` | Runs ESLint analysis across all project files. |
+| `npx drizzle-kit push` | Applies TypeScript schema updates directly to the PostgreSQL database. |
+| `npx drizzle-kit studio` | Launches Drizzle Studio GUI for inspecting and editing database records. |
+| `docker build -t creative-arena .` | Builds the multi-stage production Docker container image. |
+| `docker compose up -d` | Launches containerized application with volume persistence in detached mode. |
+| `docker compose logs -f` | Tails streaming logs from the running Docker application container. |
+
+---
+
+## Database & Storage Modes
+
+1. **Local JSON Database Mode (`LOCAL_JSON_DB=true`)**:
+   - Stores data atomically in `.local-db/database.json`.
+   - Zero installation, zero cloud latency, instant cold-starts.
+   - Ideal for local development, previews, and self-hosted single-node Docker containers.
+
+2. **Managed PostgreSQL Mode (e.g., Neon Serverless)**:
+   - Configured simply by supplying `DATABASE_URL=postgresql://...`.
+   - Built-in connection pooling (`pg.Pool`), SSL auto-detection for `neon.tech`, and idle timeouts.
+   - Protected by an **in-memory LRU cache** ([`src/lib/cache.ts`](file:///src/lib/cache.ts)) to minimize compute unit consumption (CU-hrs) and network egress.
+
+---
+
+## AI Models & Provider Setup
+
+### Text & Copywriting (OpenRouter)
+- **Flagship Recommended**: `openai/gpt-4o` (SOTA real estate copywriting, tone adaptation, and prompt engineering).
+- **Fast & Cost-Effective**: `openai/gpt-4o-mini`.
+- **Top Free 120B Model**: `nvidia/nemotron-3-super-120b-a12b:free`.
+- **Universal Free Router**: `openrouter/free` (Automatic failover among all available free providers).
+
+### Image Generation (Agnes AI & FLUX)
+- **Agnes AI (`agnes-image-2.5-flash`)**: Specializes in photorealistic architecture, realistic perspective, interior lighting, and structural materials.
+- **FLUX.1 (`black-forest-labs/FLUX.1-schnell:free`)**: High-performance open-weights photorealism.
+- **Strict Negative Prompting**: Ensured by [`src/lib/creative/image-prompt-writer.ts`](file:///src/lib/creative/image-prompt-writer.ts) to guarantee raw imagery is generated completely free of distorted text overlays, watermarks, or clutter.
+
+---
+
+## Deployment Guides
+
+### 1. Docker (Recommended Self-Hosted)
+Refer to [README-DOCKER.md](README-DOCKER.md) for full instructions on deploying via Docker CLI, Docker Compose, AWS ECS, or Kubernetes.
+
+### 2. Netlify (Live Production Host)
+Configured via `netlify.toml` and `@netlify/plugin-nextjs`.
+1. Push code to GitHub repository.
+2. Link project in Netlify dashboard.
+3. Add environment variables: `DATABASE_URL`, `OPENROUTER_API_KEY`, `AGNES_API_KEY`.
+4. Deploy.
+
+### 3. Vercel + Neon PostgreSQL
+1. Import repository into Vercel.
+2. Add `DATABASE_URL` pointing to your Neon database branch.
+3. Push schema: `npx drizzle-kit push`.
+4. Deploy.
+
+---
+
+## Troubleshooting & FAQ
+
+| Issue | Root Cause | Solution |
+|---|---|---|
+| Port 3000 in use | Another process is bound to port 3000 | In Docker, map to an alternate port: `-p 3001:3000`. |
+| PowerShell script execution blocked | Execution policy restricts `.ps1` scripts | Run commands prefixing `cmd /c` (e.g. `cmd /c npm run dev`). |
+| Canvas export images blank | Cross-origin image tainting canvas | Handled automatically via `/api/proxy-image` server-side CORS proxy. |
+| Neon SSL connection errors | SSL mode required by cloud Postgres | `src/db/index.ts` automatically attaches `rejectUnauthorized: false` for `neon.tech`. |
+| Changes in local DB not persisting in Docker | Volume not mapped | Run with `-v creative-arena-data:/app/.local-db` or use `docker compose up`. |
+
+---
+
+## Documentation Index
+
+- 📘 **[HTTP API Reference](README-API.md)** — Detailed endpoint specification, request/response payloads, and review route details.
+- 🗄️ **[Database Architecture Guide](README-DB.md)** — Dual-engine architecture, schema relationships, LRU caching, and Neon optimization.
+- 🐳 **[Docker Deployment Guide](README-DOCKER.md)** — Multi-stage Docker build, standalone optimization, security, and compose setups.
+- 🚀 **[Production Operations Guide](README-PROD.md)** — Production checklist, security recommendations, and monitoring.
+- 📜 **[Changelog](CHANGELOG.md)** — Chronological log of all versions, enhancements, and bug fixes.
 
 ---
 

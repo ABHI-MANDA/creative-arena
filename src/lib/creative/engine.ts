@@ -440,88 +440,106 @@ export async function tryLLMOverride(
   templateInstructions?: string,
   selectedDirection?: Direction
 ): Promise<{ override: CopyOverride | null; model: string; fallback: boolean }> {
-  const key = process.env.OPENROUTER_API_KEY;
-  const model = modelOverride === null
-    ? null
-    : modelOverride ?? process.env.OPENROUTER_MODEL?.trim() ?? "openai/gpt-4o-mini";
-  if (!key?.trim() || !model) return { override: null, model: "local-creative-copy-v2", fallback: true };
-  try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      signal: AbortSignal.timeout(30000),
-      headers: {
-        Authorization: `Bearer ${key.trim()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.45,
-        max_tokens: 2400,
-        messages: [
-          {
-            role: "system",
-            content: [
-              "You are a senior real-estate creative director and performance copywriter.",
-              "Return one valid JSON object only; do not use markdown fences or add commentary.",
-              "Use only supplied property facts. Never invent approvals, amenities, distances, returns, scarcity, pricing, completion dates, or guarantees. If a fact is missing, omit it.",
-              "Create polished, premium real-estate advertising with a clear reading order: project identity, one distinctive promise, verifiable proof, then one direct action.",
-              "Write distinctive, specific, readable copy. Avoid cliches, unsupported superlatives, emojis, repeated phrases, and crowded headlines.",
-              "Keep headlines concise (max 8 words), sublines factual (max 14 words), and CTAs direct. Preserve the exact supplied project name, property type, location, and price in their respective fields.",
-              "Follow the selected creative direction's visual language, palette, and tone while keeping all property claims factual.",
-              "Return keys: heroHeadline, heroSubline, lifestyleLine, featureHeadline, imagePrompt, captions, hashtags, storyboard.",
-              "captions is an object with optional instagram, facebook, linkedin, whatsapp, portal, youtube strings.",
-              "hashtags is an array of up to 12 strings.",
-              "storyboard is an array of 5 to 8 objects with t, label, visual, line, tag; make total duration 15 seconds for Instagram Reels or 30 seconds for YouTube Shorts, use a clear hook, visual progression, factual proof, and CTA end-frame.",
-              "imagePrompt describes premium real-estate photography only: preserve plausible architecture and materials, use a deliberate focal point, natural golden-hour or clean daylight color, balanced highlights, rich but accurate greens, and open sky/negative space for later typography. Do not ask an image model to render text, logos, prices, or typography.",
-              templateInstructions ? `Active template direction (follow unless it conflicts with verified facts): ${templateInstructions}` : "",
-            ].filter(Boolean).join(" "),
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              property: {
-                name: brief.name,
-                location: brief.location,
-                propertyType: brief.propertyType,
-                price: brief.price,
-                audience: brief.audience ?? dna.audience,
-                amenities: brief.amenities ?? "",
-                description: brief.description ?? "",
-              },
-              creativeDNA: {
-                positioning: dna.positioning,
-                architecture: dna.architecture,
-                visualStyle: dna.visualStyle,
-                brandTone: dna.brandTone,
-                usps: dna.usps,
-                locationAdvantages: dna.locationAdvantages,
-              },
-              campaignObjective: presetById(presetId).objective,
-              campaignPreset: presetById(presetId).label,
-              selectedCreativeDirection: selectedDirection ? {
-                name: selectedDirection.name,
-                tagline: selectedDirection.tagline,
-                description: selectedDirection.description,
-                palette: selectedDirection.hex,
-                visualApproach: selectedDirection.approach,
-                grade: selectedDirection.grade,
-              } : null,
-              requiredOutput: "Create distinct image-ad copy and an editable short-form video script.",
-            }),
-          },
-        ],
-      }),
-    });
-    if (!res.ok) throw new Error(`OpenRouter completion returned ${res.status}.`);
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const text = data.choices?.[0]?.message?.content ?? "";
-    const parsed = parseModelJson(text);
-    if (!parsed) throw new Error("Model did not return valid JSON.");
-    return { override: validateCopyOverride(parsed), model, fallback: false };
-  } catch (error) {
-    console.error("AI copy/script generation fell back to local content", error);
-    return { override: null, model: `local-creative-copy-v2 (fallback from ${model})`, fallback: true };
+  const key = process.env.OPENROUTER_API_KEY?.trim();
+  const configuredModel = process.env.OPENROUTER_MODEL?.trim() || "openai/gpt-4o";
+  const primaryModel = modelOverride === null ? null : (modelOverride ?? configuredModel);
+  if (!key || !primaryModel) return { override: null, model: "local-creative-copy-v2", fallback: true };
+
+  const candidateModels = [
+    primaryModel,
+    "openai/gpt-4o-mini",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "openrouter/free",
+  ].filter((m, i, arr) => m && arr.indexOf(m) === i);
+
+  for (const model of candidateModels) {
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        signal: AbortSignal.timeout(30000),
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.45,
+          max_tokens: 2400,
+          messages: [
+            {
+              role: "system",
+              content: [
+                "You are a senior real-estate creative director and performance copywriter.",
+                "Return one valid JSON object only; do not use markdown fences or add commentary.",
+                "Use only supplied property facts. Never invent approvals, amenities, distances, returns, scarcity, pricing, completion dates, or guarantees. If a fact is missing, omit it.",
+                "Create polished, premium real-estate advertising with a clear reading order: project identity, one distinctive promise, verifiable proof, then one direct action.",
+                "Write distinctive, specific, readable copy. Avoid cliches, unsupported superlatives, emojis, repeated phrases, and crowded headlines.",
+                "Keep headlines punchy and concise (max 7 words) so they never crowd the visual or overlay important background elements.",
+                "Keep sublines factual (max 14 words), and CTAs direct. Preserve the exact supplied project name, property type, location, and price in their respective fields.",
+                "Follow the selected creative direction's visual language, palette, and tone while keeping all property claims factual.",
+                "Return keys: heroHeadline, heroSubline, lifestyleLine, featureHeadline, imagePrompt, captions, hashtags, storyboard.",
+                "captions is an object with optional instagram, facebook, linkedin, whatsapp, portal, youtube strings.",
+                "hashtags is an array of up to 12 strings.",
+                "storyboard is an array of 5 to 8 objects with t, label, visual, line, tag; make total duration 15 seconds for Instagram Reels or 30 seconds for YouTube Shorts, use a clear hook, visual progression, factual proof, and CTA end-frame.",
+                "imagePrompt describes premium real-estate photography only: preserve plausible architecture and materials, anchor structures in lower-middle frame, maintain clean open sky negative space in upper 40% for typography overlays. Do not ask an image model to render text, logos, prices, or typography.",
+                templateInstructions ? `Active template direction (follow unless it conflicts with verified facts): ${templateInstructions}` : "",
+              ].filter(Boolean).join(" "),
+            },
+            {
+              role: "user",
+              content: JSON.stringify({
+                property: {
+                  name: brief.name,
+                  location: brief.location,
+                  propertyType: brief.propertyType,
+                  price: brief.price,
+                  audience: brief.audience ?? dna.audience,
+                  amenities: brief.amenities ?? "",
+                  description: brief.description ?? "",
+                },
+                creativeDNA: {
+                  positioning: dna.positioning,
+                  architecture: dna.architecture,
+                  visualStyle: dna.visualStyle,
+                  brandTone: dna.brandTone,
+                  usps: dna.usps,
+                  locationAdvantages: dna.locationAdvantages,
+                },
+                campaignObjective: presetById(presetId).objective,
+                campaignPreset: presetById(presetId).label,
+                selectedCreativeDirection: selectedDirection ? {
+                  name: selectedDirection.name,
+                  tagline: selectedDirection.tagline,
+                  description: selectedDirection.description,
+                  palette: selectedDirection.hex,
+                  visualApproach: selectedDirection.approach,
+                  grade: selectedDirection.grade,
+                } : null,
+                requiredOutput: "Create distinct image-ad copy and an editable short-form video script.",
+              }),
+            },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        console.warn(`[engine] OpenRouter model '${model}' returned status ${res.status}. Trying next candidate...`);
+        continue;
+      }
+
+      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const text = data.choices?.[0]?.message?.content ?? "";
+      const parsed = parseModelJson(text);
+      if (parsed) {
+        return { override: validateCopyOverride(parsed), model, fallback: false };
+      }
+    } catch (error) {
+      console.warn(`[engine] Failed to generate copy with model '${model}':`, error);
+    }
   }
+
+  console.warn("AI copy/script generation fell back to local content");
+  return { override: null, model: `local-creative-copy-v2 (fallback from ${primaryModel})`, fallback: true };
 }
 
 /* ---------------- captions & hashtags ---------------- */
@@ -674,6 +692,96 @@ export function qualityCheck(
 
 /* ---------------- campaign composer ---------------- */
 
+export type ApprovedAdContent = {
+  developer: string;
+  project: string;
+  tagline: string;
+  bhk: string;
+  locationTag: string;
+  amenitiesLine: string;
+  price: string;
+  cta: string;
+  imagePrompt: string;
+  captions?: {
+    instagram?: string;
+    facebook?: string;
+    linkedin?: string;
+    whatsapp?: string;
+    portal?: string;
+  };
+  hashtags?: string[];
+};
+
+export function parseBhk(propertyType?: string, text?: string): string {
+  const combined = `${propertyType ?? ""} ${text ?? ""}`;
+  const match = combined.match(/\b(\d+(?:\s*[,/&]\s*\d+)*\s*BHK)\b/i);
+  if (match) {
+    return match[1].replace(/\s*\/\s*/g, " & ").toUpperCase();
+  }
+  return "3 & 4 BHK";
+}
+
+export function parseDeveloperAndProject(
+  kicker?: string,
+  headline?: string,
+  brandName?: string
+): { developer: string; project: string } {
+  if (kicker && kicker !== "SIGNATURE RESIDENCES") {
+    return {
+      developer: kicker.toUpperCase(),
+      project: (headline || "").toUpperCase(),
+    };
+  }
+  const parts = (headline || "").trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return {
+      developer: parts[0].toUpperCase(),
+      project: parts.slice(1).join(" ").toUpperCase(),
+    };
+  }
+  return {
+    developer: (brandName || "EXCLUSIVE").toUpperCase(),
+    project: (headline || "").toUpperCase(),
+  };
+}
+
+export function buildDraftAdContent(
+  brief: Brief,
+  dna: DNA,
+  direction: Direction,
+  override?: CopyOverride | null,
+  brandName?: string
+): ApprovedAdContent {
+  const devAndProj = parseDeveloperAndProject(
+    brief.name.split(" ")[0],
+    brief.name,
+    brandName
+  );
+  const bhk = parseBhk(brief.propertyType, brief.description);
+  const tagline = override?.heroSubline || "WHERE LUXURY MEETS NATURE";
+  const locationTag = `LUXURY RESIDENCES IN ${brief.location.toUpperCase()}`;
+  const amenitiesLine = dna.usps.slice(0, 2).join(" | ").toUpperCase() || "80% OPEN SPACES | 20 WORLD CLASS AMENITIES";
+  const price = brief.price || "₹3.2 CR*";
+  const cta = "BOOK NOW";
+  const imagePrompt =
+    override?.imagePrompt ||
+    `Ultra-luxury architectural facade of ${brief.name}, modern residential architecture with illuminated floor-to-ceiling glass windows at dusk, reflection pool in foreground, lush landscaping, warm twilight ambient lighting, cinematic 8k resolution, elegant negative space in upper 40% for typography`;
+
+  return {
+    developer: devAndProj.developer,
+    project: devAndProj.project,
+    tagline,
+    bhk,
+    locationTag,
+    amenitiesLine,
+    price,
+    cta,
+    imagePrompt,
+    captions: override?.captions,
+    hashtags: override?.hashtags,
+  };
+}
+
 export type ComposeInput = {
   brief: Brief;
   dna: DNA;
@@ -683,6 +791,7 @@ export type ComposeInput = {
   images: Img[];
   thresholds: { ready: number; review: number };
   override?: CopyOverride | null;
+  approvedContent?: ApprovedAdContent | null;
   variant?: number;
   enabledKinds?: string[];
 };
@@ -691,22 +800,45 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
   const { brief, dna, presetId, platformIds, direction, images, thresholds } = input;
   const copy = presetCopy(presetId, brief, dna);
   const ov = input.override ?? null;
+  const ac = input.approvedContent ?? null;
   const variant = input.variant ?? 0;
   const out: NewAsset[] = [];
-  const heroLine = ov?.heroHeadline ?? copy.hero;
-  const heroSub = ov?.heroSubline ?? copy.sub;
+  const heroLine = ac?.tagline ?? (ov?.heroHeadline ?? copy.hero);
+  const heroSub = ac ? `${ac.bhk} · ${ac.locationTag}` : (ov?.heroSubline ?? copy.sub);
   const lifeLine = ov?.lifestyleLine ?? `${dna.positioning}.`;
   const seedBase = hx(brief.name + presetId + variant);
 
   const push = (platform: string, kind: string, payload: AssetPayload) => {
     const spec = platformById(platform);
     const qc = qualityCheck(`${brief.name}:${platform}:${kind}:${variant}`, thresholds);
+    const finalPayload: AssetPayload = ac
+      ? {
+          ...payload,
+          kicker: ac.developer,
+          headline: ac.project,
+          fine: ac.tagline,
+          subline: `${ac.bhk} · ${ac.locationTag}`,
+          locationLabel: ac.locationTag,
+          bullets: ac.amenitiesLine.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean),
+          priceLine: ac.price,
+          cta: ac.cta || "BOOK NOW",
+          imagePrompt: ac.imagePrompt,
+          variant,
+        }
+      : {
+          ...payload,
+          variant,
+          cta:
+            payload.cta && !payload.cta.toLowerCase().includes("1234567890") && !/\d{8,}/.test(payload.cta)
+              ? payload.cta
+              : "BOOK NOW",
+        };
     out.push({
       kind,
       platform,
       aspect: spec.aspect,
-      title: `${KIND_LABELS[kind] ?? kind} — ${spec.short}`,
-      payload: { ...payload, variant },
+      title: `${brief.name} — ${spec.aspect}`,
+      payload: finalPayload,
       score: qc.score,
       checks: qc.checks,
       status: qc.status,
@@ -714,22 +846,23 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
   };
 
   const base = {
-    kicker: copy.kicker.toUpperCase(),
-    cta: copy.cta,
+    kicker: ac?.developer ?? copy.kicker.toUpperCase(),
+    cta: ac?.cta ?? "BOOK NOW",
     hex: direction.hex,
-    imagePrompt: ov?.imagePrompt,
+    imagePrompt: ac?.imagePrompt ?? ov?.imagePrompt,
   };
 
   for (const platform of platformIds) {
+    const spec = platformById(platform);
     const kinds = (PLATFORM_KINDS[platform] ?? ["hero"])
       .filter((kind) => !input.enabledKinds || input.enabledKinds.includes(kind));
-    const wide = ["linkedin", "portal"].includes(platform);
+    const wide = ["16:9", "21:9", "linkedin", "portal"].includes(platform) || ["16:9", "21:9"].includes(spec.aspect);
     for (const kind of kinds) {
       switch (kind) {
         case "hero":
           push(platform, kind, {
             ...base,
-            kicker: "SIGNATURE RESIDENCES",
+            kicker: brief.name.split(" ")[0].toUpperCase(),
             headline: brief.name,
             subline: brief.propertyType,
             locationLabel: brief.location,
@@ -817,9 +950,15 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
     aspect: "1:1",
     title: "Copy Pack — captions & hashtags",
     payload: {
-      captions: captionsFor(platformIds, brief, dna, copy, ov),
-      hashtags: hashtagsFor(brief, dna, ov),
-      cta: copy.cta,
+      captions: ac?.captions
+        ? Object.entries(ac.captions).map(([p, text]) => ({
+            platform: p,
+            label: p.charAt(0).toUpperCase() + p.slice(1),
+            text: text ?? "",
+          }))
+        : captionsFor(platformIds, brief, dna, copy, ov),
+      hashtags: ac?.hashtags?.length ? ac.hashtags : hashtagsFor(brief, dna, ov),
+      cta: ac?.cta || "BOOK NOW",
       variant,
     },
     score: qc.score,

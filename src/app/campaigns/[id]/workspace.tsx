@@ -23,6 +23,7 @@ import {
   Package,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   Edit3,
   Wand2,
   X,
@@ -36,6 +37,7 @@ import { PipelineOverlay } from "@/components/pipeline";
 import { QualityPanel } from "@/components/quality";
 import { Storyboard } from "@/components/storyboard";
 import { Chip, DynIcon, SectionHead, StatusPill } from "@/components/ui";
+import { ReviewContentModal } from "@/components/campaigns/ReviewContentModal";
 
 const CreativeEditorModal = dynamic(
   () => import("@/components/editor/CreativeEditorModal").then((mod) => mod.CreativeEditorModal),
@@ -242,7 +244,7 @@ function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Prom
     let btmY = height - 60;
 
     if (p.cta) {
-      const ctaText = p.cta.toUpperCase() + "  →";
+      const ctaText = (p.cta && !p.cta.toLowerCase().includes("1234567890") && !/\d{8,}/.test(p.cta) ? p.cta : "BOOK NOW").toUpperCase();
       ctx.font = "bold 22px sans-serif";
       const ctaW = ctx.measureText(ctaText).width + 48;
       const ctaH = 50;
@@ -568,12 +570,10 @@ function PreviewModal({
       {/* ---- top bar ---- */}
       <div className="relative z-10 flex shrink-0 items-center justify-between gap-4 border-b border-line/60 bg-coal/80 px-5 py-3 backdrop-blur">
         <div className="flex items-center gap-2.5">
-          <DynIcon name={platformById(current.platform).icon} size={14} className="text-gold" />
-          <span className="max-w-[260px] truncate text-[13px] font-medium">{current.title}</span>
-          <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-faint">
-            {KIND_LABELS[current.kind] ?? current.kind}
+          <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-gold">
+            {current.aspect}
           </span>
-          <span className="font-mono text-[9px] uppercase tracking-widest text-faint">{current.aspect}</span>
+          <span className="max-w-[260px] truncate text-[13px] font-medium">{current.title}</span>
           {current.approved && (
             <span className="flex items-center gap-1 rounded-full bg-sage/15 px-2 py-0.5 text-[10px] text-sage">
               <BadgeCheck size={11} /> Approved
@@ -737,6 +737,7 @@ export function CampaignWorkspace({
   const [copied, setCopied] = useState("");
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   const editingAsset = assets.find((a) => a.id === editingAssetId) ?? null;
 
@@ -754,7 +755,7 @@ export function CampaignWorkspace({
   const stills = visualAssets.filter((a) => a.kind !== "reel");
   const copyPack = assets.find((a) => a.kind === "copy");
 
-  const filtered = platFilter === "all" ? stills : stills.filter((a) => a.platform === platFilter);
+  const filtered = platFilter === "all" ? stills : stills.filter((a) => a.aspect === platFilter || a.platform === platFilter);
 
   const topAsset = useMemo(() => [...assets].sort((a, b) => b.score - a.score)[0], [assets]);
   const [selectedId, setSelectedId] = useState<string>(topAsset?.id ?? "");
@@ -929,47 +930,74 @@ export function CampaignWorkspace({
   /* ---------------- draft: needs generation ---------------- */
   if (assets.length === 0) {
     return (
-      <div className="mx-auto max-w-[1040px]">
-        <Link href="/campaigns" className="mb-5 inline-flex items-center gap-2 text-[12.5px] text-faint hover:text-gold">
-          <ArrowLeft size={14} /> Campaigns
-        </Link>
-        <div className="anim-up panel overflow-hidden">
-          <div className="border-b border-line px-7 py-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <StatusPill status="draft" />
-              <Chip tone="gold">{campaign.presetLabel}</Chip>
+      <>
+        <ReviewContentModal
+          isOpen={reviewModalOpen}
+          campaignId={campaign.id}
+          property={{ ...property, cover: images[0] || null }}
+          directionId={campaign.options[selectedDir]?.id || campaign.direction?.id || undefined}
+          platformsCount={campaign.platforms.length}
+          onClose={() => setReviewModalOpen(false)}
+          onSuccess={() => {
+            router.refresh();
+          }}
+        />
+        <div className="mx-auto max-w-[1040px]">
+          <Link href="/campaigns" className="mb-5 inline-flex items-center gap-2 text-[12.5px] text-faint hover:text-gold">
+            <ArrowLeft size={14} /> Campaigns
+          </Link>
+          <div className="anim-up panel overflow-hidden">
+            <div className="border-b border-line px-7 py-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <StatusPill status="draft" />
+                <Chip tone="gold">{campaign.presetLabel}</Chip>
+              </div>
+              <h1 className="font-display mt-3 text-[30px] font-medium leading-tight">{campaign.name}</h1>
+              <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-mute">
+                <MapPin size={13} /> {property.name} · {property.location}
+              </p>
             </div>
-            <h1 className="font-display mt-3 text-[30px] font-medium leading-tight">{campaign.name}</h1>
-            <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-mute">
-              <MapPin size={13} /> {property.name} · {property.location}
-            </p>
-          </div>
-          <div className="px-7 py-6">
-            <div className="label mb-3">Creative directions — pick one to generate</div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {campaign.options.map((d, i) => (
-                <button key={d.id} onClick={() => setSelectedDir(i)} className={cx("sel-card rounded-xl p-4 text-left", selectedDir === i && "sel-on")}>
-                  <div className="mb-2 h-16 w-full rounded-lg" style={{ background: `linear-gradient(135deg, ${d.hex[0]}, ${d.hex[2]} 140%)` }} />
-                  <div className="font-display text-[15px]">{d.name}</div>
-                  <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-faint">{d.tagline}</div>
+            <div className="px-7 py-6">
+              <div className="label mb-3">Creative directions — pick one to generate</div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {campaign.options.map((d, i) => (
+                  <button key={d.id} onClick={() => setSelectedDir(i)} className={cx("sel-card rounded-xl p-4 text-left", selectedDir === i && "sel-on")}>
+                    <div className="mb-2 h-16 w-full rounded-lg" style={{ background: `linear-gradient(135deg, ${d.hex[0]}, ${d.hex[2]} 140%)` }} />
+                    <div className="font-display text-[15px]">{d.name}</div>
+                    <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-faint">{d.tagline}</div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-6 flex justify-end gap-3 border-t border-line pt-5">
+                <button
+                  onClick={() => setReviewModalOpen(true)}
+                  className="btn-gold flex items-center gap-2 rounded-xl px-6 py-3 text-[13.5px] font-semibold"
+                >
+                  <Sparkles size={15} />
+                  Review &amp; Generate Content
                 </button>
-              ))}
-            </div>
-            <div className="mt-6 flex justify-end border-t border-line pt-5">
-              <button onClick={generateDraft} disabled={genBusy} className="btn-gold flex items-center gap-2 rounded-xl px-6 py-3 text-[13.5px] font-semibold disabled:opacity-50">
-                {genBusy ? <Loader2 size={15} className="spin-slow" /> : <Wand2 size={15} />}
-                Generate full campaign
-              </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   /* ---------------- revealed workspace ---------------- */
   return (
     <>
+      <ReviewContentModal
+        isOpen={reviewModalOpen}
+        campaignId={campaign.id}
+        property={{ ...property, cover: images[0] || null }}
+        directionId={campaign.direction?.id || campaign.options[selectedDir]?.id || undefined}
+        platformsCount={campaign.platforms.length}
+        onClose={() => setReviewModalOpen(false)}
+        onSuccess={() => {
+          router.refresh();
+        }}
+      />
       {previewId && (
         <PreviewModal
           assets={assets}
@@ -1010,10 +1038,10 @@ export function CampaignWorkspace({
             <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-mute">
               <MapPin size={13} /> {property.name} · {property.location} · {property.price}
             </p>
-            <div className="mt-3 flex gap-1.5">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {campaign.platforms.map((pl) => (
-                <span key={pl} title={platformById(pl).label} className="rounded-lg border border-line bg-panel2 p-2 text-mute">
-                  <DynIcon name={platformById(pl).icon} size={13.5} />
+                <span key={pl} className="rounded-lg border border-line bg-panel2 px-2.5 py-1 font-mono text-[11px] font-bold text-gold">
+                  {platformById(pl).aspect}
                 </span>
               ))}
             </div>
@@ -1025,6 +1053,13 @@ export function CampaignWorkspace({
             </div>
           </div>
           <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setReviewModalOpen(true)}
+              className="flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-[13px] font-semibold text-gold transition hover:bg-gold/20"
+            >
+              <Sparkles size={15} />
+              Review &amp; Edit Content
+            </button>
             <button onClick={downloadPackage} disabled={packageBusy} className="btn-gold flex items-center gap-2 rounded-xl px-5 py-3 text-[13px] font-semibold disabled:opacity-60">
               {packageBusy ? <Loader2 size={15} className="spin-slow" /> : <Package size={15} />}
               {packageBusy ? `Exporting ${exporting || "package"}` : "Download ZIP Package"}
@@ -1093,16 +1128,16 @@ export function CampaignWorkspace({
               title={`${stills.length} ad frames`}
               action={
                 <div className="flex flex-wrap gap-1.5">
-                  {["all", ...new Set(stills.map((a) => a.platform))].map((pl) => (
+                  {["all", ...new Set(stills.map((a) => a.aspect))].map((asp) => (
                     <button
-                      key={pl}
-                      onClick={() => setPlatFilter(pl)}
+                      key={asp}
+                      onClick={() => setPlatFilter(asp)}
                       className={cx(
                         "rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] transition-all",
-                        platFilter === pl ? "border-gold/60 bg-gold/10 text-gold" : "border-line text-faint hover:text-mute"
+                        platFilter === asp ? "border-gold/60 bg-gold/10 text-gold" : "border-line text-faint hover:text-mute"
                       )}
                     >
-                      {pl === "all" ? "All" : platformById(pl).short}
+                      {asp === "all" ? "All" : asp}
                     </button>
                   ))}
                 </div>
@@ -1113,14 +1148,12 @@ export function CampaignWorkspace({
                 <div key={a.id} className={cx("panel panel-hover overflow-hidden rounded-2xl border border-line bg-coal", selectedId === a.id && "border-gold/60 ring-1 ring-gold/40")}>
                   {/* TOP TOOLBAR HEADER - ABOVE CREATIVE IMAGE */}
                   <div className="border-b border-line bg-panel/90 px-3.5 py-3 backdrop-blur space-y-2.5">
-                    {/* Row 1: Platform, Kind, QC Score */}
+                    {/* Row 1: Ratio & QC Score */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-lg border border-line bg-coal text-gold">
-                          <DynIcon name={platformById(a.platform).icon} size={13} />
+                        <span className="font-mono text-[13px] font-bold tracking-wider text-gold">
+                          {a.aspect}
                         </span>
-                        <span className="text-[12.5px] font-semibold text-cream">{KIND_LABELS[a.kind] ?? a.kind}</span>
-                        <span className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-faint">{a.aspect}</span>
                         {a.payload.editingStatus === "edited" && (
                           <span className="rounded-full bg-sage/15 px-2 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-sage font-medium">Edited</span>
                         )}

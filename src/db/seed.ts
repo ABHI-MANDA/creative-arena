@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, isLocalJsonDb } from "./index";
 import { readLocalDatabase, updateLocalDatabase } from "./local-json";
 import {
@@ -51,6 +51,11 @@ export async function ensureSeed(): Promise<boolean> {
   }
 
   try {
+    const initRow = await db.select().from(settings).where(eq(settings.key, "system_initialized")).limit(1);
+    if (initRow.length > 0) {
+      isSeededCache = true;
+      return true;
+    }
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(properties);
     if (count > 0) {
       isSeededCache = true;
@@ -186,13 +191,18 @@ export async function ensureSeed(): Promise<boolean> {
 }
 
 async function ensureLocalSeed(): Promise<boolean> {
-  const seeded = await readLocalDatabase((database) => database.properties.length > 0);
+  const seeded = await readLocalDatabase(
+    (database) =>
+      database.settings.some((s) => s.key === "system_initialized") ||
+      database.properties.length > 0
+  );
   if (seeded) return true;
 
   return updateLocalDatabase((database) => {
-    if (database.properties.length) return true;
+    if (database.settings.some((s) => s.key === "system_initialized") || database.properties.length) return true;
 
     database.settings.push({ key: "brand", value: DEFAULT_BRAND });
+    database.settings.push({ key: "system_initialized", value: { initialized: true } });
     const propertyIds: Record<string, string> = {};
 
     for (const set of ["villa", "tower"]) {
