@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   compress: true,
   experimental: {
     optimizePackageImports: ["lucide-react"],
+    turbopackFileSystemCacheForBuild: true,
   },
   images: {
     formats: ["image/avif", "image/webp"],
@@ -12,4 +13,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-

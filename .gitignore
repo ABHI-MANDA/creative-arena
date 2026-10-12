@@ -45,6 +45,8 @@ tsconfig.tsbuildinfo
 # Deployment & cloud tooling
 .vercel
 .netlify
+/.vinext/
+/.wrangler/
 
 # Turborepo cache
 .turbo
@@ -73,4 +75,3 @@ ehthumbs.db
 *.njsproj
 *.sln
 *.sw?
-

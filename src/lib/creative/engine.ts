@@ -5,7 +5,7 @@
  * the brand QC checklist.
  * ------------------------------------------------------------------ */
 
-import { KIND_LABELS, PLATFORM_KINDS, platformById, presetById, QC_CHECKLIST } from "./presets";
+import { KIND_LABELS, PLATFORM_KINDS, platformById, presetById, QC_CHECKLIST, type BrandSettings } from "./presets";
 
 export type Brief = {
   name: string;
@@ -49,6 +49,18 @@ export type Direction = {
 export type Shot = { t: string; label: string; visual: string; line: string; tag: string };
 export type Caption = { platform: string; label: string; text: string };
 
+export type AdTextSection =
+  | "developer"
+  | "headline"
+  | "tagline"
+  | "bhk"
+  | "location"
+  | "amenities"
+  | "price"
+  | "cta";
+
+export type AdFontSizes = Partial<Record<AdTextSection, number>>;
+
 export type AssetPayload = {
   kicker?: string;
   headline?: string;
@@ -63,6 +75,8 @@ export type AssetPayload = {
   imagePrompt?: string;
   hex?: string[];
   layout?: "overlay" | "wide";
+  designStyle?: "editorial" | "minimal" | "bold";
+  fontSizes?: AdFontSizes;
   shots?: Shot[];
   hook?: string;
   music?: string;
@@ -416,7 +430,7 @@ function validateCopyOverride(value: Record<string, unknown>): CopyOverride {
     heroSubline: boundedText(value.heroSubline, 180),
     lifestyleLine: boundedText(value.lifestyleLine, 110),
     featureHeadline: boundedText(value.featureHeadline, 100),
-    imagePrompt: boundedText(value.imagePrompt, 700),
+    imagePrompt: typeof value.imagePrompt === "string" && value.imagePrompt.trim() ? value.imagePrompt.trim() : undefined,
     storyboard: storyboard && storyboard.length >= 5 ? storyboard : undefined,
     captions: Object.keys(captions).length ? captions : undefined,
     hashtags: hashtags.length ? hashtags : undefined,
@@ -438,27 +452,44 @@ export async function tryLLMOverride(
   presetId: string,
   modelOverride?: string | null,
   templateInstructions?: string,
-  selectedDirection?: Direction
+  selectedDirection?: Direction,
+  brandSettings?: Pick<BrandSettings, "name" | "color" | "tones">
 ): Promise<{ override: CopyOverride | null; model: string; fallback: boolean }> {
-  const key = process.env.OPENROUTER_API_KEY?.trim();
-  const configuredModel = process.env.OPENROUTER_MODEL?.trim() || "openai/gpt-4o";
-  const primaryModel = modelOverride === null ? null : (modelOverride ?? configuredModel);
-  if (!key || !primaryModel) return { override: null, model: "local-creative-copy-v2", fallback: true };
+  const agnesKey = process.env.AGNES_API_KEY?.trim();
+  const openrouterKey = process.env.OPENROUTER_API_KEY?.trim();
+  const agnesBase = (process.env.AGNES_BASE_URL?.trim() || "https://apihub.agnes-ai.com/v1").replace(/\/+$/, "");
 
-  const candidateModels = [
+  const configuredModel =
+    process.env.AGNES_TEXT_MODEL?.trim() ||
+    (agnesKey ? "agnes-3.0-flash" : (process.env.OPENROUTER_MODEL?.trim() || "openai/gpt-4o"));
+  const primaryModel = modelOverride === null ? null : (modelOverride ?? configuredModel);
+  if (!primaryModel || (!agnesKey && !openrouterKey)) {
+    return { override: null, model: "local-creative-copy-v2", fallback: true };
+  }
+
+  const candidateModels: string[] = [
     primaryModel,
+    ...(agnesKey ? ["agnes-3.0-flash"] : []),
     "openai/gpt-4o-mini",
     "nvidia/nemotron-3-super-120b-a12b:free",
     "openrouter/free",
-  ].filter((m, i, arr) => m && arr.indexOf(m) === i);
+  ].filter((m, i, arr): m is string => Boolean(m && arr.indexOf(m) === i));
 
   for (const model of candidateModels) {
+    const isAgnesModel = model.toLowerCase().startsWith("agnes-");
+    const endpoint = isAgnesModel
+      ? `${agnesBase}/chat/completions`
+      : "https://openrouter.ai/api/v1/chat/completions";
+    const apiKey = isAgnesModel ? (agnesKey || openrouterKey) : openrouterKey;
+    if (!apiKey) continue;
+
     try {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      console.log(`[engine] Requesting copy generation from '${model}' at ${endpoint}...`);
+      const res = await fetch(endpoint, {
         method: "POST",
         signal: AbortSignal.timeout(30000),
         headers: {
-          Authorization: `Bearer ${key}`,
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -476,18 +507,19 @@ export async function tryLLMOverride(
                 "Write distinctive, specific, readable copy. Avoid cliches, unsupported superlatives, emojis, repeated phrases, and crowded headlines.",
                 "Keep headlines punchy and concise (max 7 words) so they never crowd the visual or overlay important background elements.",
                 "Keep sublines factual (max 14 words), and CTAs direct. Preserve the exact supplied project name, property type, location, and price in their respective fields.",
-                "Follow the selected creative direction's visual language, palette, and tone while keeping all property claims factual.",
+                "Match the supplied company's name, brand tone, and brand palette alongside the selected campaign preset and creative direction, while keeping all property claims factual.",
                 "Return keys: heroHeadline, heroSubline, lifestyleLine, featureHeadline, imagePrompt, captions, hashtags, storyboard.",
                 "captions is an object with optional instagram, facebook, linkedin, whatsapp, portal, youtube strings.",
                 "hashtags is an array of up to 12 strings.",
                 "storyboard is an array of 5 to 8 objects with t, label, visual, line, tag; make total duration 15 seconds for Instagram Reels or 30 seconds for YouTube Shorts, use a clear hook, visual progression, factual proof, and CTA end-frame.",
-                "imagePrompt describes premium real-estate photography only: preserve plausible architecture and materials, anchor structures in lower-middle frame, maintain clean open sky negative space in upper 40% for typography overlays. Do not ask an image model to render text, logos, prices, or typography.",
+                "imagePrompt describes premium real-estate photography only: preserve plausible architecture and materials, anchor structures in lower-middle frame, maintain clean open sky negative space in upper 40% for typography overlays. Do not ask an image model to render text, logos, prices, or typography. There is no character or word limit on imagePrompt; write an unconstrained, richly detailed photographic brief.",
                 templateInstructions ? `Active template direction (follow unless it conflicts with verified facts): ${templateInstructions}` : "",
               ].filter(Boolean).join(" "),
             },
             {
               role: "user",
               content: JSON.stringify({
+                company: brandSettings ?? null,
                 property: {
                   name: brief.name,
                   location: brief.location,
@@ -523,7 +555,7 @@ export async function tryLLMOverride(
       });
 
       if (!res.ok) {
-        console.warn(`[engine] OpenRouter model '${model}' returned status ${res.status}. Trying next candidate...`);
+        console.warn(`[engine] Model '${model}' on ${endpoint} returned status ${res.status}. Trying next candidate...`);
         continue;
       }
 
@@ -531,6 +563,7 @@ export async function tryLLMOverride(
       const text = data.choices?.[0]?.message?.content ?? "";
       const parsed = parseModelJson(text);
       if (parsed) {
+        console.log(`[engine] Successfully generated copy with model '${model}'`);
         return { override: validateCopyOverride(parsed), model, fallback: false };
       }
     } catch (error) {
@@ -702,6 +735,9 @@ export type ApprovedAdContent = {
   price: string;
   cta: string;
   imagePrompt: string;
+  layout?: "automatic" | "poster" | "split";
+  designStyle?: "editorial" | "minimal" | "bold";
+  fontSizes?: AdFontSizes;
   captions?: {
     instagram?: string;
     facebook?: string;
@@ -718,7 +754,7 @@ export function parseBhk(propertyType?: string, text?: string): string {
   if (match) {
     return match[1].replace(/\s*\/\s*/g, " & ").toUpperCase();
   }
-  return "3 & 4 BHK";
+  return "";
 }
 
 export function parseDeveloperAndProject(
@@ -750,22 +786,50 @@ export function buildDraftAdContent(
   dna: DNA,
   direction: Direction,
   override?: CopyOverride | null,
-  brandName?: string
+  brandName?: string,
+  presetId = "luxury-property"
 ): ApprovedAdContent {
-  const devAndProj = parseDeveloperAndProject(
-    brief.name.split(" ")[0],
-    brief.name,
-    brandName
-  );
+  const devAndProj = {
+    developer: (brandName?.trim() || brief.name.split(" ")[0] || "EXCLUSIVE").toUpperCase(),
+    project: brief.name.toUpperCase(),
+  };
   const bhk = parseBhk(brief.propertyType, brief.description);
-  const tagline = override?.heroSubline || "WHERE LUXURY MEETS NATURE";
-  const locationTag = `LUXURY RESIDENCES IN ${brief.location.toUpperCase()}`;
-  const amenitiesLine = dna.usps.slice(0, 2).join(" | ").toUpperCase() || "80% OPEN SPACES | 20 WORLD CLASS AMENITIES";
-  const price = brief.price || "₹3.2 CR*";
-  const cta = "BOOK NOW";
+  const presetCtas: Record<string, string> = {
+    "luxury-property": "Explore Residences",
+    "project-launch": "Register Interest",
+    "new-phase-launch": "Register Interest",
+    "property-sale": "Book a Site Visit",
+    rental: "Request a Viewing",
+    investment: "Request Project Details",
+    "open-house": "Reserve Your Visit",
+    "festival-offer": "Request Offer Details",
+    "construction-progress": "View Project Progress",
+    "location-highlight": "Explore the Location",
+  };
+  const presetTaglines: Record<string, string> = {
+    "luxury-property": "A considered address, designed for living",
+    "project-launch": "Discover a new address",
+    "new-phase-launch": "Discover the next chapter",
+    "property-sale": "Find your next home",
+    rental: "Find a place that feels like yours",
+    investment: "Explore the opportunity",
+    "open-house": "Experience the property in person",
+    "festival-offer": "Explore the current offer",
+    "construction-progress": "See the progress for yourself",
+    "location-highlight": "Make this neighbourhood yours",
+  };
+  const tagline = override?.heroSubline || presetTaglines[presetId] || "Discover this address";
+  const propertyType = brief.propertyType
+    .replace(/\b\d+(?:\s*[,/&]\s*\d+)*\s*BHK\b/i, "")
+    .replace(/^[\s,/&-]+|[\s,/&-]+$/g, "")
+    .trim();
+  const locationTag = [propertyType, brief.location].filter(Boolean).join(" IN ").toUpperCase();
+  const amenitiesLine = dna.usps.slice(0, 2).join(" | ").toUpperCase();
+  const price = brief.price;
+  const cta = presetCtas[presetId] || "Explore Residences";
   const imagePrompt =
     override?.imagePrompt ||
-    `Ultra-luxury architectural facade of ${brief.name}, modern residential architecture with illuminated floor-to-ceiling glass windows at dusk, reflection pool in foreground, lush landscaping, warm twilight ambient lighting, cinematic 8k resolution, elegant negative space in upper 40% for typography`;
+    `Create a photorealistic advertising background for ${brief.propertyType} at ${brief.name}, ${brief.location}. Match the verified architectural character (${dna.architecture}) and use only confirmed features (${dna.usps.join(", ") || "no specific amenities supplied"}). Follow the ${presetById(presetId).label} campaign objective (${presetById(presetId).objective}) and the ${direction.name} visual direction: ${direction.grade}. Reserve clear negative space for separately overlaid ad copy. No text, logos, prices, or invented property details.`;
 
   return {
     developer: devAndProj.developer,
@@ -777,6 +841,8 @@ export function buildDraftAdContent(
     price,
     cta,
     imagePrompt,
+    layout: "automatic",
+    designStyle: "editorial",
     captions: override?.captions,
     hashtags: override?.hashtags,
   };
@@ -817,13 +883,16 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
           kicker: ac.developer,
           headline: ac.project,
           fine: ac.tagline,
-          subline: `${ac.bhk} · ${ac.locationTag}`,
+        subline: [ac.bhk, ac.locationTag].filter(Boolean).join(" · "),
           locationLabel: ac.locationTag,
           bullets: ac.amenitiesLine.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean),
           priceLine: ac.price,
-          cta: ac.cta || "BOOK NOW",
+        cta: ac.cta,
           imagePrompt: ac.imagePrompt,
-          variant,
+        layout: ac.layout === "poster" ? "overlay" : ac.layout === "split" ? "wide" : payload.layout,
+        designStyle: ac.designStyle ?? "editorial",
+        fontSizes: ac.fontSizes,
+        variant,
         }
       : {
           ...payload,
@@ -847,7 +916,7 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
 
   const base = {
     kicker: ac?.developer ?? copy.kicker.toUpperCase(),
-    cta: ac?.cta ?? "BOOK NOW",
+    cta: ac?.cta ?? copy.cta,
     hex: direction.hex,
     imagePrompt: ac?.imagePrompt ?? ov?.imagePrompt,
   };
@@ -958,7 +1027,7 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
           }))
         : captionsFor(platformIds, brief, dna, copy, ov),
       hashtags: ac?.hashtags?.length ? ac.hashtags : hashtagsFor(brief, dna, ov),
-      cta: ac?.cta || "BOOK NOW",
+      cta: ac?.cta?.trim() || copy.cta,
       variant,
     },
     score: qc.score,

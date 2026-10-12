@@ -119,11 +119,11 @@ flowchart TD
 - Eliminated aero signs (`↗`), `"ma-arena.studio"` text, and series label watermarks from all visual deliverables.
 - Creatives are 100% clean, pristine, and ready for commercial posting.
 
-### 5. Agnes AI & OpenRouter Integration for Architectural Imagery
-- **Agnes AI Engine**: Integrates `agnes-image-2.5-flash` for ultra-fast, photorealistic luxury architectural photography.
+### 5. Agnes AI Integration for Content Writing & Architectural Imagery
+- **Agnes AI Content Writing (`agnes-3.0-flash`)**: SOTA ultra-fast creative copywriting, positioning headlines, narrative hooks, and negative-space-aware photographic prompt engineering.
+- **Agnes AI Image Engine (`agnes-image-2.1-flash`)**: High-resolution photorealistic architectural and luxury real-estate image engine.
 - **Intelligent Prompt Engineering**: [`src/lib/creative/image-prompt-writer.ts`](file:///src/lib/creative/image-prompt-writer.ts) adds negative prompt constraints (zero overlaid text, clean skies, realistic textures, natural lighting).
-- **Graceful Fallbacks**: Automatic fallback to OpenRouter FLUX.1 (`FLUX.1-schnell:free` / `FLUX.1-dev:free`) or Pollinations FLUX.
-- **Text & Copy Models**: Support for OpenRouter flagship (`openai/gpt-4o`) and free models (`nvidia/nemotron-3-super-120b-a12b:free`, `openrouter/free`).
+- **Graceful Fallbacks**: Automatic fallback to OpenRouter text models (`openai/gpt-4o-mini`, `openrouter/free`) and FLUX.1 (`FLUX.1-schnell:free` / `FLUX.1-dev:free`).
 
 ### 6. Database Storage & Network Egress Optimization
 - **In-Memory LRU Caching**: Added high-efficiency cache layer ([`src/lib/cache.ts`](file:///src/lib/cache.ts)) for frequent database queries (`brand:settings`, `dashboard:stats`, `properties:list`), drastically reducing Neon compute hours (CU-hrs) and network transfer egress.
@@ -162,8 +162,8 @@ All aspect ratios are presented cleanly **by ratio only** (no platform or format
 | **Graphic Editor** | **Fabric.js v7** | In-browser canvas manipulation, vector scaling, layer editing |
 | **Database** | **PostgreSQL + Drizzle ORM** | `pg` driver + automatic Local JSON fallback (`.local-db`) |
 | **Caching** | **In-Memory LRU Cache** | Sub-millisecond reads, Neon compute & egress optimizer |
-| **Image AI** | **Agnes AI & FLUX** | `agnes-image-2.5-flash`, `FLUX.1-schnell:free` |
-| **Text AI** | **OpenRouter** | `openai/gpt-4o`, `openai/gpt-4o-mini`, `openrouter/free` |
+| **Image AI** | **Agnes AI & FLUX** | `agnes-image-2.1-flash`, `FLUX.1-schnell:free` |
+| **Text AI** | **Agnes AI & OpenRouter** | `agnes-3.0-flash`, `openai/gpt-4o`, `openai/gpt-4o-mini` |
 | **Web Scraper** | **Cheerio** | Server-side DOM parser for listing URLs |
 | **Image Proxy** | **Server-side CORS Proxy** | `/api/proxy-image` prevents canvas tainting |
 | **Export Engine** | **HTML5 Canvas 2D + JSZip** | Client-side 1080p DOM snapshot rendering & ZIP packaging |
@@ -319,11 +319,12 @@ docker run -d \
 |---|---|---|---|
 | `LOCAL_JSON_DB` | Optional | `true` | When `true`, uses the embedded atomic file database (`.local-db`). |
 | `DATABASE_URL` | Optional | *None* | PostgreSQL URI (e.g. Neon connection string). When omitted, auto-falls back to JSON mode. |
-| `OPENROUTER_API_KEY` | Optional | *None* | OpenRouter API key for automated copywriting and prompt intelligence. |
-| `OPENROUTER_MODEL` | Optional | `openai/gpt-4o` | Model used for copywriting. Supports `openai/gpt-4o-mini`, `openrouter/free`, etc. |
-| `AGNES_API_KEY` | Optional | *None* | Agnes AI API key for photorealistic architectural imagery generation. |
+| `AGNES_API_KEY` | Optional | *None* | Agnes AI API key for content writing and architectural imagery. |
 | `AGNES_BASE_URL` | Optional | `https://apihub.agnes-ai.com/v1` | Agnes AI API endpoint URL. |
-| `AGNES_MODEL` | Optional | `agnes-image-2.5-flash` | Agnes AI model variant (`agnes-image-2.5-flash` or `2.1-flash`). |
+| `AGNES_TEXT_MODEL` | Optional | `agnes-3.0-flash` | Content writing model for headlines, copy, and prompt engineering. |
+| `AGNES_MODEL` | Optional | `agnes-image-2.1-flash` | Agnes AI image model variant (`agnes-image-2.1-flash`). |
+| `OPENROUTER_API_KEY` | Optional | *None* | OpenRouter API key for fallback copywriting. |
+| `OPENROUTER_MODEL` | Optional | `agnes-3.0-flash` | Fallback text model slug. |
 | `IMAGE_API_BASE_URL` | Optional | *None* | Alternative image generation provider base URL (e.g., FLUX.1). |
 | `IMAGE_API_KEY` | Optional | *None* | Key for alternative image provider. |
 | `IMAGE_MODEL` | Optional | *None* | Model slug for alternative image provider. |
@@ -363,14 +364,16 @@ docker run -d \
 
 ## AI Models & Provider Setup
 
-### Text & Copywriting (OpenRouter)
-- **Flagship Recommended**: `openai/gpt-4o` (SOTA real estate copywriting, tone adaptation, and prompt engineering).
-- **Fast & Cost-Effective**: `openai/gpt-4o-mini`.
+### Content Writing & Copywriting (Agnes AI & OpenRouter)
+- **Primary Recommended**: `agnes-3.0-flash` (SOTA real estate copywriting, tone adaptation, positioning, and prompt engineering via Agnes AI).
+- **Flagship Alternative**: `openai/gpt-4o` via OpenRouter.
+- **Fast Alternative**: `openai/gpt-4o-mini`.
 - **Top Free 120B Model**: `nvidia/nemotron-3-super-120b-a12b:free`.
 - **Universal Free Router**: `openrouter/free` (Automatic failover among all available free providers).
 
 ### Image Generation (Agnes AI & FLUX)
-- **Agnes AI (`agnes-image-2.5-flash`)**: Specializes in photorealistic architecture, realistic perspective, interior lighting, and structural materials.
+- **Agnes AI (`agnes-image-2.1-flash`)**: High-resolution photorealistic architectural imagery, exterior perspective, interior lighting, and structural materials.
+- **Agnes AI Fast Alternative**: `agnes-image-2.5-flash`.
 - **FLUX.1 (`black-forest-labs/FLUX.1-schnell:free`)**: High-performance open-weights photorealism.
 - **Strict Negative Prompting**: Ensured by [`src/lib/creative/image-prompt-writer.ts`](file:///src/lib/creative/image-prompt-writer.ts) to guarantee raw imagery is generated completely free of distorted text overlays, watermarks, or clutter.
 

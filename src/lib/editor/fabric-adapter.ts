@@ -103,11 +103,12 @@ export function populateEditableOverlays(
     return tb;
   };
 
-  const isWide = kind !== "hero" && (
-    payload.layout === "wide" ||
-    ["linkedin", "portal"].includes(platform) ||
-    aspect === "16:9"
-  );
+  const isWide = payload.layout
+    ? payload.layout === "wide"
+    : kind !== "hero" && (
+        ["linkedin", "portal"].includes(platform) ||
+        aspect === "16:9"
+      );
 
   // ─────────────────────────────────────────────────────────────
   // LUXURY REAL-ESTATE POSTER LAYOUT (PosterBody in ad-creative.tsx)
@@ -182,7 +183,7 @@ export function populateEditableOverlays(
         left: lm, top: H - 3.5 * cqw - fs - 2 * cqw,
         width: ctaW, height: fs + 2.2 * cqw,
         rx: (fs + 2.2 * cqw) / 2, ry: (fs + 2.2 * cqw) / 2,
-        fill: "#d9ab5e", backgroundColor: "transparent",
+        fill: "#ffffff", backgroundColor: "transparent",
       });
       (ctaBg as unknown as { meta: ObjectMeta }).meta = meta("cta-bg", "CTA Button", "shape");
       canvas.add(ctaBg);
@@ -313,8 +314,8 @@ export function populateEditableOverlays(
     const ctaBg = new fabric.Rect({
       left: pad, top: btmY - ctaH + fs * 0.5,
       width: ctaW, height: ctaH,
-      rx: ctaH / 2, ry: ctaH / 2,
-      fill: "rgba(236,201,103,0.9)",
+      rx: 0, ry: 0,
+      fill: "#ffffff",
       backgroundColor: "transparent",
     });
     (ctaBg as unknown as { meta: ObjectMeta }).meta = meta("cta-bg", "CTA Button", "shape");
@@ -357,7 +358,7 @@ function parseBhk(propertyType?: string, subline?: string): string {
   if (match) {
     return match[1].replace(/\s*\/\s*/g, " & ").toUpperCase();
   }
-  return "3 & 4 BHK";
+  return "";
 }
 
 function parseDeveloperAndProject(
@@ -365,6 +366,9 @@ function parseDeveloperAndProject(
   headline?: string,
   brandName?: string
 ): { developer: string; project: string } {
+  if (kicker !== undefined && !kicker.trim()) {
+    return { developer: "", project: (headline || "").toUpperCase() };
+  }
   if (kicker && kicker !== "SIGNATURE RESIDENCES") {
     return {
       developer: kicker.toUpperCase(),
@@ -395,21 +399,19 @@ function populatePosterObjects(
   const { developer, project } = parseDeveloperAndProject(payload.kicker, payload.headline, brand.name);
   const bhk = parseBhk(payload.subline, payload.kicker);
   const locationTag = payload.locationLabel
-    ? `LUXURY RESIDENCES IN ${payload.locationLabel.toUpperCase()}`
+    ? payload.locationLabel.toUpperCase()
     : payload.subline
     ? payload.subline.toUpperCase()
-    : "LUXURY RESIDENCES";
+    : "";
   const bullets = (payload.bullets ?? []).slice(0, 3);
   const amenitiesLine = bullets.length >= 2
     ? `${bullets[0]} | ${bullets[1]}`.toUpperCase()
     : bullets.length === 1
     ? bullets[0].toUpperCase()
-    : "80% OPEN SPACES | 20 WORLD CLASS AMENITIES";
-  const tagline = payload.fine ? payload.fine.toUpperCase() : "WHERE LUXURY MEETS NATURE";
-  const price = payload.priceLine || "₹3.2 CR*";
-  const contactText = payload.cta && !payload.cta.toLowerCase().includes("1234567890") && !/\d{8,}/.test(payload.cta)
-    ? payload.cta.toUpperCase()
-    : "BOOK NOW";
+    : "";
+  const tagline = payload.fine?.toUpperCase() ?? "";
+  const price = payload.priceLine ?? "";
+  const contactText = payload.cta?.toUpperCase() ?? "";
 
   // 1. Ambient Top Scrim for crisp text contrast against sky/foliage
   const scrim = new fabric.Rect({
@@ -631,7 +633,7 @@ function populatePosterObjects(
 
   // 8. Starting Price Block
   const priceLabelFs = Math.max(8, Math.round(1.8 * cqw));
-  const startLabel = new fabric.Textbox("——  STARTING FROM  ——", {
+  const startLabel = new fabric.Textbox(price ? "——  STARTING FROM  ——" : "", {
     left: width / 2,
     top: currentTop,
     originX: "center",
@@ -741,7 +743,9 @@ export function populateDefaultFabricObjects(
 ) {
   const { width, height } = getCanvasDimensions(aspect);
 
-  const isWide = payload.layout === "wide" || ["linkedin", "portal"].includes(platform) || aspect === "16:9";
+  const isWide = payload.layout
+    ? payload.layout === "wide"
+    : ["linkedin", "portal"].includes(platform) || aspect === "16:9";
 
   if (isWide) {
     const panelWidth = Math.round(width * 0.46);

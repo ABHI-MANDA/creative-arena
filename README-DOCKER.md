@@ -122,11 +122,12 @@ docker run -d \
 | `NODE_ENV` | `production` | Enables production optimizations in Next.js. |
 | `LOCAL_JSON_DB` | `true` | Enables atomic local JSON file storage (`/app/.local-db`). |
 | `DATABASE_URL` | *None* | Connection string for Neon / PostgreSQL. |
-| `OPENROUTER_API_KEY` | *None* | Key for OpenRouter copywriting & prompt intelligence. |
-| `OPENROUTER_MODEL` | `openai/gpt-4o` | Text generation model slug. |
-| `AGNES_API_KEY` | *None* | Key for Agnes AI architectural image generation. |
+| `AGNES_API_KEY` | *None* | Key for Agnes AI content writing and architectural image generation. |
 | `AGNES_BASE_URL` | `https://apihub.agnes-ai.com/v1` | Agnes API endpoint URL. |
-| `AGNES_MODEL` | `agnes-image-2.5-flash` | Agnes AI model variant. |
+| `AGNES_TEXT_MODEL` | `agnes-3.0-flash` | Content writing model for copy and prompt engineering. |
+| `AGNES_MODEL` | `agnes-image-2.1-flash` | Agnes AI image model variant. |
+| `OPENROUTER_API_KEY` | *None* | Key for OpenRouter fallback copywriting & prompt intelligence. |
+| `OPENROUTER_MODEL` | `agnes-3.0-flash` | Text generation model slug. |
 
 ---
 

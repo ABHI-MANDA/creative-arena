@@ -72,8 +72,13 @@ Discovers available OpenRouter AI models for prompt and copy generation.
 ```json
 {
   "configured": true,
-  "default": "openai/gpt-4o",
+  "default": "agnes-3.0-flash",
   "models": [
+    {
+      "id": "agnes-3.0-flash",
+      "name": "Agnes 3.0 Flash (Recommended)",
+      "contextLength": 128000
+    },
     {
       "id": "openai/gpt-4o",
       "name": "GPT-4o (Flagship)",
@@ -101,9 +106,15 @@ Lists supported image generation models across Agnes AI and FLUX.
 {
   "models": [
     {
+      "id": "agnes-image-2.1-flash",
+      "name": "Agnes Image 2.1 Flash (Recommended)",
+      "description": "SOTA high-resolution photorealistic architectural & real-estate image engine by Agnes AI.",
+      "free": false
+    },
+    {
       "id": "agnes-image-2.5-flash",
-      "name": "Agnes Image 2.5 Flash (Recommended)",
-      "description": "SOTA ultra-fast photorealistic architectural & real-estate image engine by Agnes AI.",
+      "name": "Agnes Image 2.5 Flash",
+      "description": "Agnes AI ultra-fast photorealistic architectural & real-estate image engine.",
       "free": false
     },
     {
@@ -187,7 +198,7 @@ Proxies external images through the server with `Access-Control-Allow-Origin: *`
   },
   "directionId": "dir_golden_hour",
   "directionName": "Golden Hour Cinema",
-  "model": "openai/gpt-4o"
+  "model": "agnes-3.0-flash"
 }
 ```
 
@@ -220,7 +231,7 @@ Executes final asset generation. If `approvedContent` is provided, the engine st
   "generated": 8,
   "telemetry": {
     "durationMs": 4200,
-    "model": "agnes-image-2.5-flash",
+    "model": "agnes-image-2.1-flash",
     "costCents": 3
   }
 }

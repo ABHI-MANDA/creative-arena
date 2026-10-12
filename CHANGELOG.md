@@ -4,6 +4,18 @@ Notable changes to M & A Creative Arena are recorded here in chronological order
 
 ---
 
+## [1.5.0] - 2026-10-10
+
+### Added
+- **Agnes 3.0 Flash for Content Writing (`agnes-3.0-flash`)**:
+  - Wired native Agnes AI chat completions endpoint (`https://apihub.agnes-ai.com/v1/chat/completions`) using `agnes-3.0-flash` for high-precision real-estate copywriting, headline generation, storyboards, and photography prompt engineering.
+  - Added `agnes-3.0-flash` as the #1 recommended model in model discovery and resolution catalogs.
+- **Agnes Image 2.1 Flash for Image Generation (`agnes-image-2.1-flash`)**:
+  - Configured `agnes-image-2.1-flash` as the primary recommended engine for architectural and property visual generation.
+  - Implemented automatic case-insensitive model normalization (e.g. `Agnes-Image-2.1-Flash` $\to$ `agnes-image-2.1-flash`).
+
+---
+
 ## [1.4.0] - 2026-10-09
 
 ### Added

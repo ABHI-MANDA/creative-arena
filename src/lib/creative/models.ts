@@ -37,8 +37,14 @@ function isFreeTextModel(model: OpenRouterCatalogModel) {
 
 const FEATURED_MODELS: OpenRouterModel[] = [
   {
+    id: "agnes-3.0-flash",
+    name: "Agnes 3.0 Flash (Recommended)",
+    contextLength: 128_000,
+    description: "SOTA ultra-fast real-estate copywriting, brand positioning, and architectural prompt engineering by Agnes AI.",
+  },
+  {
     id: "openai/gpt-4o",
-    name: "OpenAI GPT-4o (Recommended Flagship)",
+    name: "OpenAI GPT-4o (Flagship)",
     contextLength: 128_000,
     description: "Flagship SOTA reasoning, high-converting real-estate copywriting and photography art direction.",
   },
@@ -65,6 +71,8 @@ const FEATURED_MODELS: OpenRouterModel[] = [
 export async function listFreeOpenRouterModels(): Promise<OpenRouterModel[]> {
   if (cachedCatalog && cachedCatalog.expiresAt > Date.now()) return cachedCatalog.models;
   const key = process.env.OPENROUTER_API_KEY?.trim();
+  const hasAgnes = Boolean(process.env.AGNES_API_KEY?.trim());
+  if (!key && !hasAgnes) return FEATURED_MODELS;
   if (!key) return FEATURED_MODELS;
 
   try {
@@ -103,6 +111,7 @@ export async function listFreeOpenRouterModels(): Promise<OpenRouterModel[]> {
 function modelScore(model: OpenRouterModel) {
   const id = model.id.toLowerCase();
   let score = Math.min(model.contextLength, 128_000) / 4_000;
+  if (/agnes/.test(id)) score += 100;
   if (/gpt-4o/.test(id)) score += 50;
   if (/qwen3|qwen-3/.test(id)) score += 36;
   if (/deepseek-r1|deepseek-v3/.test(id)) score += 34;
@@ -116,21 +125,18 @@ function modelScore(model: OpenRouterModel) {
 
 export async function resolveOpenRouterModel(selection?: string) {
   if (selection && selection !== "auto") return selection;
+  const agnesText = process.env.AGNES_TEXT_MODEL?.trim();
+  if (agnesText) return agnesText;
+  if (process.env.AGNES_API_KEY?.trim()) return "agnes-3.0-flash";
   const configured = process.env.OPENROUTER_MODEL?.trim();
   if (configured) return configured;
-  try {
-    const models = await listFreeOpenRouterModels();
-    if (models[0]?.id) return models[0].id;
-  } catch {
-    // Fall back to gpt-4o
-  }
-  return "openai/gpt-4o";
+  return "agnes-3.0-flash";
 }
 
 export async function isFreeOpenRouterModel(modelId: string) {
   if (!modelId) return false;
-  if (modelId === "auto") return true;
-  const configured = process.env.OPENROUTER_MODEL?.trim();
+  if (modelId === "auto" || /agnes/i.test(modelId)) return true;
+  const configured = process.env.AGNES_TEXT_MODEL?.trim() || process.env.OPENROUTER_MODEL?.trim();
   if (configured && modelId === configured) return true;
   if (FEATURED_MODELS.some((m) => m.id === modelId)) return true;
   try {

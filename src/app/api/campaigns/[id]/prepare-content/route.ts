@@ -61,7 +61,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       bundle.campaign.preset,
       requestedModel,
       templateInstructions,
-      direction
+      direction,
+      { name: brand.name, color: brand.color, tones: brand.tones }
     );
     await setAppSetting(`campaign-model:${id}`, model);
 
@@ -70,7 +71,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       bundle.dna as Parameters<typeof buildDraftAdContent>[1],
       direction,
       override,
-      brand?.name
+      brand?.name,
+      bundle.campaign.preset
     );
 
     await setAppSetting(`campaign-draft-content:${id}`, draftContent);
@@ -87,4 +89,3 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Failed to prepare ad content for review." }, { status: 500 });
   }
 }
-

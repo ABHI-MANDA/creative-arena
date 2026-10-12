@@ -24,7 +24,7 @@ flowchart LR
 
     subgraph DataAI["Data & AI Cloud Services"]
         Neon["Neon Serverless PostgreSQL\n(SSL Auto-Detect, Pooled)"]
-        Agnes["Agnes AI Image Engine\n(agnes-image-2.5-flash)"]
+        Agnes["Agnes AI Engine\n(agnes-3.0-flash / agnes-image-2.1-flash)"]
         OpenRouter["OpenRouter Text Models\n(GPT-4o / Nemotron 120B)"]
     end
 

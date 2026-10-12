@@ -13,15 +13,15 @@ export type ImageModel = {
 
 const KNOWN_IMAGE_MODELS: ImageModel[] = [
   {
-    id: "agnes-image-2.5-flash",
-    name: "Agnes Image 2.5 Flash (Recommended)",
-    description: "SOTA ultra-fast photorealistic architectural & real-estate image engine by Agnes AI.",
+    id: "agnes-image-2.1-flash",
+    name: "Agnes Image 2.1 Flash (Recommended)",
+    description: "SOTA high-resolution photorealistic architectural & real-estate image engine by Agnes AI.",
     free: false,
   },
   {
-    id: "agnes-image-2.1-flash",
-    name: "Agnes Image 2.1 Flash",
-    description: "Agnes AI high-resolution photorealism engine.",
+    id: "agnes-image-2.5-flash",
+    name: "Agnes Image 2.5 Flash",
+    description: "Agnes AI ultra-fast photorealistic architectural & real-estate image engine.",
     free: false,
   },
   {
@@ -115,7 +115,7 @@ export function aspectToSize(aspect: string): "1024x1024" | "1024x1792" | "1792x
   const [w, h] = aspect.split(":").map(Number);
   const r = (!w || !h) ? 1 : w / h;
   if (r < 0.75) return "1024x1792";
-  if (r > 1.4)  return "1792x1024";
+  if (r > 1.3)  return "1792x1024";
   return "1024x1024";
 }
 
@@ -150,9 +150,9 @@ export async function generateAdImage(
   if (agnesKey) {
     const agnesBase = resolveAgnesBaseUrl();
     const agnesModel =
-      options.model?.startsWith("agnes-")
-        ? options.model
-        : (process.env.AGNES_MODEL?.trim() || "agnes-image-2.5-flash");
+      options.model && /agnes/i.test(options.model)
+        ? options.model.toLowerCase()
+        : (process.env.AGNES_MODEL?.trim().toLowerCase() || "agnes-image-2.1-flash");
 
     try {
       console.log(`[image-provider] Calling Agnes AI (${agnesModel}) at ${agnesBase}/images/generations with size ${options.size ?? "1024x1024"}...`);
