@@ -5,7 +5,8 @@ import { listCampaigns } from "@/db/queries";
 import { CampaignRowCard } from "@/components/cards";
 import { EmptyState, SectionHead } from "@/components/ui";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function CampaignsPage() {
   await ensureSeed();

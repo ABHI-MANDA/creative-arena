@@ -37,6 +37,8 @@ export function Storyboard({
               <img
                 src={images[i % images.length]}
                 alt={s.label}
+                loading="lazy"
+                decoding="async"
                 className="absolute inset-0 h-full w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-b from-ink/40 via-transparent to-ink/85" />

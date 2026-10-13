@@ -237,7 +237,7 @@ function CampaignWizard() {
               {properties.map((p) => (
                 <button key={p.id} onClick={() => setPropertyId(p.id)} className={cx("sel-card flex items-center gap-3 rounded-xl p-3 text-left", propertyId === p.id && "sel-on")}>
                   <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg hairline">
-                    {p.cover && <img src={p.cover} alt={p.name} className="h-full w-full object-cover" />}
+                    {p.cover && <img src={p.cover} alt={p.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />}
                   </div>
                   <div className="min-w-0">
                     <div className="truncate text-[13.5px] font-medium">{p.name}</div>

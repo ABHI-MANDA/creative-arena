@@ -68,7 +68,7 @@ export function BeforeAfter({
         onPointerLeave={() => (dragging.current = false)}
       >
         {/* bottom: original */}
-        <img src={original} alt="Original property" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={original} alt="Original property" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
         <span className="absolute bottom-3 left-3 z-10 rounded-full bg-ink/70 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-cream/80 backdrop-blur">
           Original
         </span>
@@ -80,6 +80,8 @@ export function BeforeAfter({
               <img
                 src={original}
                 alt="AI enhanced property"
+                loading="lazy"
+                decoding="async"
                 className="absolute inset-0 h-full w-full object-cover"
                 style={{ filter: "brightness(1.07) contrast(1.1) saturate(1.22) sepia(0.12)" }}
               />

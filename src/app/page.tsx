@@ -21,7 +21,8 @@ import { KIND_LABELS } from "@/lib/creative/presets";
 import { formatLocalDate, getGreetingForHour } from "@/lib/utils";
 import { HeroGreeting, LiveActivityTimestamp } from "@/components/live-time";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function getInitialServerTime() {
   const now = new Date();
@@ -68,7 +69,8 @@ export default async function OverviewPage() {
   };
 
   const heroAsset =
-    stats.lib.find((l) => l.asset.kind === "hero")?.asset ??
+    stats.latestCreative ??
+    stats.lib.find((l) => l.asset.kind !== "copy")?.asset ??
     stats.lib[0]?.asset ??
     fallbackHeroAsset;
   const ready = stats.ready;
@@ -102,7 +104,7 @@ export default async function OverviewPage() {
           {heroAsset && (
             <div className="floaty hidden self-stretch md:flex md:flex-col">
               <div className="mb-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.22em] text-faint">
-                <span>Latest hero frame</span>
+                <span>Latest generated creative</span>
                 <span className="text-gold">QC {heroAsset.score}</span>
               </div>
               <div className="min-h-0 flex-1">
@@ -116,7 +118,7 @@ export default async function OverviewPage() {
       {/* ---------- stats ---------- */}
       <section className="anim-up anim-d1 mb-8 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <StatCard icon={Clapperboard} label="Active Campaigns" value={String(stats.camps.filter((c) => c.campaign.status !== "archived").length)} sub={`${stats.camps.filter((c) => c.campaign.status === "draft").length} in draft`} spark={spark} accent />
-        <StatCard icon={Building2} label="Assets Generated" value={String(stats.lib.length)} sub={`${new Set(stats.lib.map((l) => l.asset.platform)).size} platforms`} spark={spark} />
+        <StatCard icon={Building2} label="Assets Generated" value={String(stats.totalAssets ?? stats.lib.length)} sub={`${stats.totalPlatforms ?? new Set(stats.lib.map((l) => l.asset.platform)).size} platforms`} spark={spark} />
         <StatCard icon={Gauge} label="Avg QC Score" value={stats.avg ? `${stats.avg}` : "—"} sub="11-point brand check" />
         <StatCard icon={BadgeCheck} label="Approved / Ready" value={`${stats.approved} / ${ready}`} sub="Publishable now" />
       </section>

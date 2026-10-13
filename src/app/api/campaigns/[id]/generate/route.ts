@@ -340,6 +340,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     /* ---- Persist assets (unchanged logic) ---- */
     if (isLocalJsonDb) {
       await updateLocalDatabase((database) => {
+        const isApproved = Boolean(approvedContent);
         database.assets = database.assets.filter((asset) => asset.campaignId !== id);
         database.assets.push(
           ...composed!.map((asset) => ({
@@ -354,14 +355,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             score: asset.score,
             checks: asset.checks,
             status: asset.status,
-            approved: false,
+            approved: isApproved,
             createdAt: new Date(),
           }))
         );
         const campaign = database.campaigns.find((row) => row.id === id);
-        if (campaign) Object.assign(campaign, { status: "ready", direction });
+        if (campaign) Object.assign(campaign, { status: isApproved ? "approved" : "ready", direction });
       });
     } else {
+      const isApproved = Boolean(approvedContent);
       await db.delete(assets).where(eq(assets.campaignId, id));
       await db.insert(assets).values(
         composed.map((asset) => ({
@@ -375,9 +377,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           score: asset.score,
           checks: asset.checks,
           status: asset.status,
+          approved: isApproved,
         }))
       );
-      await db.update(campaigns).set({ status: "ready", direction }).where(eq(campaigns.id, id));
+      await db.update(campaigns).set({ status: isApproved ? "approved" : "ready", direction }).where(eq(campaigns.id, id));
     }
 
     /* ---- Log generation actions ---- */

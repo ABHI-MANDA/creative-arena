@@ -25,8 +25,9 @@ export const pool =
   new Pool({
     connectionString: databaseUrl,
     max: 5,
-    idleTimeoutMillis: 10000,
+    idleTimeoutMillis: 2000,
     connectionTimeoutMillis: 10000,
+    allowExitOnIdle: true,
     ssl: databaseUrl.includes("neon.tech") || databaseUrl.includes("sslmode=")
       ? { rejectUnauthorized: false }
       : undefined,

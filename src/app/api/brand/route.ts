@@ -7,7 +7,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   await ensureSeed();
-  return NextResponse.json(await getBrand());
+  return NextResponse.json(await getBrand(), {
+    headers: {
+      "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+    },
+  });
 }
 
 export async function POST(req: Request) {

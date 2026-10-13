@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sql } from "drizzle-orm";
 import { db, isLocalJsonDb } from "@/db";
 import { readLocalDatabase } from "@/db/local-json";
 import { assets, campaigns, generations, properties } from "@/db/schema";
@@ -168,7 +169,7 @@ export async function GET(request: Request) {
               score: assets.score,
               aspect: assets.aspect,
               checks: assets.checks,
-              payload: assets.payload,
+              payload: sql<Record<string, unknown>>`${assets.payload} - 'designJson' - 'image'`,
             })
             .from(assets)
             .limit(500),
@@ -190,7 +191,7 @@ export async function GET(request: Request) {
           properties: propertyRows as any,
           campaigns: campaignRows as any,
           assets: assetRows.map((a) => {
-            const { designJson: _stripped, ...safePayload } = (a.payload || {}) as Record<string, unknown> & { designJson?: unknown };
+            const { designJson: _stripped, image: _img, ...safePayload } = (a.payload || {}) as Record<string, unknown> & { designJson?: unknown; image?: unknown };
             return { ...a, payload: safePayload as any };
           }) as any,
           generations: generationRows as any,

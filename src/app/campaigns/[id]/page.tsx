@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import { ensureSeed } from "@/db/seed";
 import { getBrand, getCampaignBundle, listCampaignActions } from "@/db/queries";
+import { directionsFor } from "@/lib/creative/engine";
 import { CampaignWorkspace } from "./workspace";
 
-export const revalidate = 15;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function CampaignPage({
   params,
@@ -23,6 +25,19 @@ export default async function CampaignPage({
     ? bundle.selectedModel
     : actions.find((action) => action.kind === "compose" || action.kind === "video-script")?.model ?? "Not generated yet";
 
+  const brief = {
+    name: property.name,
+    location: property.location,
+    propertyType: property.propertyType,
+    price: property.price,
+    audience: property.audience,
+    amenities: property.amenities,
+    description: property.description,
+  };
+  const directions = (campaign.options && campaign.options.length > 0)
+    ? campaign.options
+    : (bundle.dna ? directionsFor(bundle.dna, brief) : []);
+
   return (
     <CampaignWorkspace
       fresh={fresh === "1"}
@@ -34,8 +49,8 @@ export default async function CampaignPage({
         presetLabel: campaign.presetLabel,
         platforms: campaign.platforms ?? [],
         status: campaign.status,
-        options: campaign.options ?? [],
-        direction: campaign.direction ?? null,
+        options: directions,
+        direction: campaign.direction ?? directions[0] ?? null,
         model: contentModel,
       }}
       property={{

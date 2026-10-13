@@ -1,4 +1,4 @@
-import { desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ne, sql } from "drizzle-orm";
 import { db, isLocalJsonDb } from "./index";
 import { readLocalDatabase, updateLocalDatabase } from "./local-json";
 import {
@@ -18,7 +18,7 @@ import {
   DEFAULT_BRAND,
   type BrandSettings,
 } from "@/lib/creative/presets";
-import { analyzeDNA, type DNA } from "@/lib/creative/engine";
+import { analyzeDNA, type DNA, type AssetPayload } from "@/lib/creative/engine";
 import { getOrSetCache, invalidateCache } from "@/lib/cache";
 import { recordDbMetric } from "@/lib/observability";
 
@@ -255,7 +255,7 @@ export async function getProperty(id: string) {
             platform: assets.platform,
             aspect: assets.aspect,
             title: assets.title,
-            payload: assets.payload,
+            payload: sql<AssetPayload>`${assets.payload} - 'designJson'`,
             score: assets.score,
             status: assets.status,
             approved: assets.approved,
@@ -530,7 +530,7 @@ export async function getCampaignBundle(id: string) {
   if (isLocalJsonDb) {
     return getLocalCampaignBundle(id);
   }
-  return getOrSetCache(`campaign:bundle:${id}`, 60, async () => {
+  return getOrSetCache(`campaign:bundle:${id}`, 0, async () => {
     const started = Date.now();
     try {
       const camps = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
@@ -679,7 +679,7 @@ export type LibraryAsset = {
 
 export async function listLibraryAssets(propertyId?: string): Promise<LibraryAsset[]> {
   const cacheKey = `assets:library:${propertyId ?? "all"}`;
-  return getOrSetCache(cacheKey, 30, async () => {
+  return getOrSetCache(cacheKey, 60, async () => {
     const started = Date.now();
     try {
       if (isLocalJsonDb) {
@@ -689,10 +689,11 @@ export async function listLibraryAssets(propertyId?: string): Promise<LibraryAss
           return [...rows]
             .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
             .map((asset) => {
+              const { designJson: _d, ...lightPayload } = (asset.payload || {}) as Record<string, unknown>;
               const campaign = database.campaigns.find((row) => row.id === asset.campaignId);
               const property = database.properties.find((row) => row.id === asset.propertyId);
               return {
-                asset,
+                asset: { ...asset, payload: lightPayload as typeof asset.payload },
                 campaignName: campaign?.name ?? "",
                 propertyName: property?.name ?? "",
                 preset: campaign?.presetLabel ?? "",
@@ -701,7 +702,7 @@ export async function listLibraryAssets(propertyId?: string): Promise<LibraryAss
         });
       }
 
-      // Explicit projections, excluding heavy designJson
+      // Explicit projections, excluding heavy designJson at the database query level
       const [all, camps, props] = await Promise.all([
         propertyId
           ? db
@@ -713,7 +714,7 @@ export async function listLibraryAssets(propertyId?: string): Promise<LibraryAss
                 platform: assets.platform,
                 aspect: assets.aspect,
                 title: assets.title,
-                payload: assets.payload,
+                payload: sql<AssetPayload>`${assets.payload} - 'designJson'`,
                 score: assets.score,
                 status: assets.status,
                 approved: assets.approved,
@@ -731,7 +732,7 @@ export async function listLibraryAssets(propertyId?: string): Promise<LibraryAss
                 platform: assets.platform,
                 aspect: assets.aspect,
                 title: assets.title,
-                payload: assets.payload,
+                payload: sql<AssetPayload>`${assets.payload} - 'designJson'`,
                 score: assets.score,
                 status: assets.status,
                 approved: assets.approved,
@@ -963,6 +964,9 @@ export type DashboardStats = {
   avg: number;
   approved: number;
   byKind: [string, number][];
+  latestCreative?: Asset | null;
+  totalAssets?: number;
+  totalPlatforms?: number;
 };
 
 export async function dashboardStats(): Promise<DashboardStats> {
@@ -976,36 +980,106 @@ export async function dashboardStats(): Promise<DashboardStats> {
         const approved = lib.filter((l) => l.asset.approved).length;
         const byKind = new Map<string, number>();
         for (const l of lib) byKind.set(l.asset.kind, (byKind.get(l.asset.kind) ?? 0) + 1);
-        return { camps, lib, brand, ready, avg, approved, byKind: [...byKind.entries()] };
+
+        // Find best ad picture from the latest generated campaign
+        let latestCreative: Asset | null = null;
+        for (const c of camps) {
+          const campVisualAssets = lib
+            .filter((l) => l.asset.campaignId === c.campaign.id && l.asset.kind !== "copy" && l.asset.payload?.image)
+            .sort((a, b) => (b.asset.score || 0) - (a.asset.score || 0));
+          if (campVisualAssets.length > 0) {
+            latestCreative = campVisualAssets[0].asset;
+            break;
+          }
+        }
+        if (!latestCreative) {
+          const anyVisual = lib
+            .filter((l) => l.asset.kind !== "copy" && l.asset.payload?.image)
+            .sort((a, b) => (b.asset.score || 0) - (a.asset.score || 0));
+          latestCreative = anyVisual[0]?.asset ?? lib[0]?.asset ?? null;
+        }
+
+        return {
+          camps,
+          lib: latestCreative ? [{ asset: latestCreative }] : lib,
+          brand,
+          ready,
+          avg,
+          approved,
+          byKind: [...byKind.entries()],
+          latestCreative,
+          totalAssets: lib.length,
+          totalPlatforms: new Set(lib.map((l) => l.asset.platform)).size,
+        };
       }
 
       // High-efficiency queries:
-      // 1. Camps summary (cached listCampaigns)
+      // 1. Camps summary (cached listCampaigns - ordered by createdAt desc)
       // 2. Brand (cached getBrand)
-      // 3. Asset metrics (ONLY 4 tiny columns from assets, zero JSON payloads!)
-      // 4. ONE single hero asset for the hero visual card
-      const [camps, brand, assetMetrics, [heroAsset]] = await Promise.all([
+      // 3. Asset metrics (ONLY 5 tiny columns from assets, zero JSON payloads!)
+      const [camps, brand, assetMetrics] = await Promise.all([
         listCampaigns(),
         getBrand(),
         db
           .select({
             kind: assets.kind,
+            platform: assets.platform,
             score: assets.score,
             status: assets.status,
             approved: assets.approved,
           })
           .from(assets),
-        db
+      ]);
+
+      // Find the latest generated campaign that has assets
+      const latestCampWithAssets = camps.find((c) => c.assetCount > 0);
+      let latestCreative: Asset | null = null;
+
+      if (latestCampWithAssets) {
+        // Query best visual ad picture (kind != 'copy') from this latest campaign by score desc
+        const campVisuals = await db
           .select()
           .from(assets)
-          .where(eq(assets.kind, "hero"))
+          .where(
+            and(
+              eq(assets.campaignId, latestCampWithAssets.campaign.id),
+              ne(assets.kind, "copy")
+            )
+          )
+          .orderBy(desc(assets.score), desc(assets.createdAt))
+          .limit(1);
+
+        if (campVisuals.length) {
+          latestCreative = campVisuals[0];
+        } else {
+          // If no non-copy asset exists, pick any asset from this latest campaign
+          const anyCampAsset = await db
+            .select()
+            .from(assets)
+            .where(eq(assets.campaignId, latestCampWithAssets.campaign.id))
+            .orderBy(desc(assets.score))
+            .limit(1);
+          if (anyCampAsset.length) {
+            latestCreative = anyCampAsset[0];
+          }
+        }
+      }
+
+      // Fallback if no campaign had assets
+      if (!latestCreative) {
+        const fallbackVisuals = await db
+          .select()
+          .from(assets)
+          .where(ne(assets.kind, "copy"))
           .orderBy(desc(assets.score))
-          .limit(1)
-          .then(async (rows) => {
-            if (rows.length) return rows;
-            return db.select().from(assets).limit(1);
-          }),
-      ]);
+          .limit(1);
+        if (fallbackVisuals.length) {
+          latestCreative = fallbackVisuals[0];
+        } else {
+          const anyFallback = await db.select().from(assets).limit(1);
+          latestCreative = anyFallback[0] ?? null;
+        }
+      }
 
       recordDbMetric("dashboardStats", Date.now() - started, 1, 1500);
 
@@ -1019,8 +1093,8 @@ export async function dashboardStats(): Promise<DashboardStats> {
         byKindMap.set(a.kind, (byKindMap.get(a.kind) ?? 0) + 1);
       }
 
-      // Return hero asset in lib wrapper for backwards-compatibility with OverviewPage
-      const libWrapper = heroAsset ? [{ asset: heroAsset }] : [];
+      // Return hero asset in lib wrapper for backwards-compatibility
+      const libWrapper = latestCreative ? [{ asset: latestCreative }] : [];
 
       return {
         camps,
@@ -1030,11 +1104,14 @@ export async function dashboardStats(): Promise<DashboardStats> {
         avg,
         approved,
         byKind: [...byKindMap.entries()],
+        latestCreative,
+        totalAssets: assetMetrics.length,
+        totalPlatforms: new Set(assetMetrics.map((a) => a.platform)).size,
       };
     } catch (err) {
       console.error("dashboardStats error", err);
       const brand = await getBrand();
-      return { camps: [], lib: [], brand, ready: 0, avg: 0, approved: 0, byKind: [] };
+      return { camps: [], lib: [], brand, ready: 0, avg: 0, approved: 0, byKind: [], latestCreative: null, totalAssets: 0, totalPlatforms: 0 };
     }
   }, "dashboard");
 }

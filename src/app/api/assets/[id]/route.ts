@@ -1,13 +1,34 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, isLocalJsonDb } from "@/db";
-import { assets } from "@/db/schema";
+import { assets, campaigns } from "@/db/schema";
 import { readLocalDatabase, updateLocalDatabase } from "@/db/local-json";
 import { recomposeAsset, directionsFor, analyzeDNA, type AssetPayload } from "@/lib/creative/engine";
 import { getBrand, getCampaignBundle, logGeneration } from "@/db/queries";
 import { invalidateCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const asset = isLocalJsonDb
+      ? await readLocalDatabase((database) => database.assets.find((row) => row.id === id) ?? null)
+      : (await db.select().from(assets).where(eq(assets.id, id)).limit(1))[0] ?? null;
+
+    if (!asset) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    return NextResponse.json(asset, {
+      headers: {
+        "Cache-Control": "private, max-age=15, stale-while-revalidate=60",
+      },
+    });
+  } catch (error) {
+    console.error("Failed to get asset:", error);
+    return NextResponse.json({ error: "Failed to fetch asset" }, { status: 500 });
+  }
+}
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -26,20 +47,67 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!asset) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     if (action === "approve" || action === "unapprove") {
-      if (isLocalJsonDb) {
-        await updateLocalDatabase((database) => {
-          const storedAsset = database.assets.find((row) => row.id === id);
-          if (storedAsset) storedAsset.approved = action === "approve";
-        });
-      } else {
-        await db.update(assets).set({ approved: action === "approve" }).where(eq(assets.id, id));
+      const isApproved = action === "approve";
+      let allVisualApproved = false;
+
+      if (!isLocalJsonDb) {
+        try {
+          await db
+            .update(assets)
+            .set({ approved: isApproved })
+            .where(eq(assets.id, id));
+
+          const campAssets = await db
+            .select({ id: assets.id, kind: assets.kind, approved: assets.approved })
+            .from(assets)
+            .where(eq(assets.campaignId, asset.campaignId));
+
+          const visuals = campAssets.filter((a) => a.kind !== "copy");
+          allVisualApproved =
+            visuals.length > 0 &&
+            visuals.every((a) => (a.id === id ? isApproved : a.approved));
+
+          if (allVisualApproved) {
+            await db
+              .update(campaigns)
+              .set({ status: "approved" })
+              .where(eq(campaigns.id, asset.campaignId));
+          }
+        } catch (e) {
+          console.error("Neon asset update error in PATCH:", e);
+        }
       }
+
+      await updateLocalDatabase((database) => {
+        const storedAsset = database.assets.find((row) => row.id === id);
+        if (storedAsset) storedAsset.approved = isApproved;
+        const campAssets = database.assets.filter((a) => a.campaignId === asset.campaignId && a.kind !== "copy");
+        if (campAssets.length > 0 && campAssets.every((a) => a.id === id ? isApproved : a.approved)) {
+          const camp = database.campaigns.find((c) => c.id === asset.campaignId);
+          if (camp) camp.status = "approved";
+          allVisualApproved = true;
+        }
+      });
+
       await logGeneration({ kind: "approval", model: "operator", campaignId: asset.campaignId, propertyId: asset.propertyId });
       invalidateCache("assets");
+      invalidateCache("campaigns");
       invalidateCache(`campaign:bundle:${asset.campaignId}`);
+      invalidateCache(`campaign:${asset.campaignId}`);
       invalidateCache("dashboard");
       invalidateCache("admin");
-      return NextResponse.json({ ok: true, approved: action === "approve" });
+
+      try {
+        revalidatePath(`/campaigns/${asset.campaignId}`);
+        revalidatePath(`/campaigns`);
+        revalidatePath(`/`);
+      } catch {}
+
+      return NextResponse.json({
+        ok: true,
+        approved: isApproved,
+        campaignStatus: allVisualApproved ? "approved" : undefined,
+      });
     }
 
     if (action === "regenerate") {
@@ -91,7 +159,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       await logGeneration({ kind: "qc", model: "qc-heuristics-1.1", durationMs: 220, costCents: 1, campaignId: asset.campaignId, propertyId: asset.propertyId });
 
       invalidateCache("assets");
+      invalidateCache("campaigns");
       invalidateCache(`campaign:bundle:${asset.campaignId}`);
+      invalidateCache(`campaign:${asset.campaignId}`);
       invalidateCache("dashboard");
       invalidateCache("admin");
 

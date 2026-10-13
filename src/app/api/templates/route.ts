@@ -44,7 +44,11 @@ function sanitizeLibrary(value: Partial<TemplateLibrary>): TemplateLibrary {
 }
 
 export async function GET() {
-  return NextResponse.json(await getAppSetting(TEMPLATE_LIBRARY_KEY, DEFAULT_TEMPLATE_LIBRARY));
+  return NextResponse.json(await getAppSetting(TEMPLATE_LIBRARY_KEY, DEFAULT_TEMPLATE_LIBRARY), {
+    headers: {
+      "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+    },
+  });
 }
 
 export async function PUT(req: Request) {

@@ -381,7 +381,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
       </div>
 
       <div className="relative h-full flex-1">
-        <img src={p.image} alt={asset.title ?? "ad visual"} className="ad-img" />
+        <img src={p.image} alt={asset.title ?? "ad visual"} loading="lazy" decoding="async" className="ad-img" />
         <div
           className="ad-wide-scrim"
           style={{
@@ -418,7 +418,7 @@ export function AdCreative({
     >
       {!wide && (
         <>
-          <img src={asset.payload.image} alt={asset.title ?? "ad visual"} className="ad-img" />
+          <img src={asset.payload.image} alt={asset.title ?? "ad visual"} loading="lazy" decoding="async" className="ad-img" />
           {/* Dynamic project-adaptive scrim for 100% typography contrast and open focal subject visibility */}
           <div
             className="ad-scrim"

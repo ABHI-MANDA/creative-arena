@@ -19,6 +19,7 @@ import {
   Sun,
 } from "lucide-react";
 import { cx } from "@/lib/utils";
+import { SearchPalette } from "@/components/search-palette";
 
 type ThemeMode = "dark" | "light";
 
@@ -147,14 +148,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <Image src="/images/brand-logo.png" alt="M & A" width={32} height={32} className="h-8 w-8 object-contain" />
               <span className="font-display text-lg">M &amp; A</span>
           </div>
-          <div className="hidden items-center gap-2 rounded-xl bg-panel px-3 py-2 hairline md:flex md:w-[340px]">
-            <Search size={14} className="text-faint" />
-            <input
-              placeholder="Search properties, campaigns, ads…"
-              className="w-full bg-transparent text-[13px] text-cream outline-none placeholder:text-faint"
-            />
-            <kbd className="rounded border border-line px-1.5 font-mono text-[9px] text-faint">⌘K</kbd>
-          </div>
+          <SearchPalette />
           <div className="flex items-center gap-2.5">
             <button
               type="button"

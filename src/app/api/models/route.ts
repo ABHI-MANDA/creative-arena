@@ -11,7 +11,10 @@ export async function GET() {
   }
   try {
     const models = await listFreeOpenRouterModels();
-    return NextResponse.json({ configured: true, models });
+    return NextResponse.json(
+      { configured: true, models },
+      { headers: { "Cache-Control": "public, max-age=180, stale-while-revalidate=600" } }
+    );
   } catch {
     return NextResponse.json({ configured: true, models: [], error: "Could not load models." }, { status: 502 });
   }

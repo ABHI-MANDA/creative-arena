@@ -16,6 +16,7 @@ export function PropertyCard({ card }: { card: PropertyCardT }) {
             src={cover}
             alt={p.name}
             loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.045]"
           />
         )}
@@ -72,7 +73,7 @@ export function CampaignRowCard({ row }: { row: CampaignRow }) {
     >
       <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg hairline">
         {cover ? (
-          <img src={cover} alt={c.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={cover} alt={c.name} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-panel2 text-faint">
             <Building2 size={16} />

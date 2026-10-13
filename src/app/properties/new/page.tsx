@@ -285,7 +285,7 @@ export default function NewPropertyPage() {
                     return (
                       <button key={s.url + s.label} onClick={() => toggleShot({ url: s.url, label: s.label })} className={cx("sel-card relative overflow-hidden rounded-xl", on && "sel-on")}>
                         <div className="aspect-[4/3] w-full">
-                          <img src={s.url} alt={s.label} className="h-full w-full object-cover" />
+                          <img src={s.url} alt={s.label} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                         </div>
                         <div className="px-2 py-1.5 text-left font-mono text-[9px] uppercase tracking-widest text-mute">{s.label}</div>
                         {on && (
@@ -322,7 +322,7 @@ export default function NewPropertyPage() {
               <div className="grid grid-cols-2 gap-2">
                 {images.map((im, i) => (
                   <div key={im.url + i} className="group relative overflow-hidden rounded-xl hairline">
-                    <img src={im.url} alt={im.label} className="aspect-[4/3] w-full object-cover" />
+                    <img src={im.url} alt={im.label} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
                     <span className="absolute left-1.5 top-1.5 rounded bg-ink/75 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-widest text-cream/85">{im.label}</span>
                     <button onClick={() => setImages((c) => c.filter((x) => x.url !== im.url))} className="absolute right-1.5 top-1.5 rounded-full bg-ink/75 p-1 text-cream/70 opacity-0 transition-opacity group-hover:opacity-100">
                       <X size={10} />
@@ -412,7 +412,7 @@ export default function NewPropertyPage() {
             </dl>
             {images[0] && (
               <div className="mt-5 overflow-hidden rounded-xl hairline">
-                <img src={images[0].url} alt="cover" className="aspect-[16/9] w-full object-cover" />
+                <img src={images[0].url} alt="cover" loading="lazy" decoding="async" className="aspect-[16/9] w-full object-cover" />
               </div>
             )}
           </div>

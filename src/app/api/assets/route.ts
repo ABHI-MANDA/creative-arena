@@ -12,6 +12,11 @@ export async function GET() {
       ...l.asset,
       campaignName: l.campaignName,
       propertyName: l.propertyName,
-    }))
+    })),
+    {
+      headers: {
+        "Cache-Control": "public, max-age=15, stale-while-revalidate=60",
+      },
+    }
   );
 }

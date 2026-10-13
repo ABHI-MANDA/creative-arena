@@ -64,7 +64,7 @@ export default async function PropertyPage({
       {/* ---------- property hero ---------- */}
       <section className="anim-up panel relative mb-7 overflow-hidden">
         <div className="relative aspect-[16/6.4] min-h-[240px]">
-          <img src={cover} alt={p.name} className="absolute inset-0 h-full w-full object-cover" />
+          <img src={cover} alt={p.name} decoding="async" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/35 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-4 p-6 md:p-8">
             <div>
@@ -196,7 +196,7 @@ export default async function PropertyPage({
               <div className="grid grid-cols-3 gap-1.5 p-2">
                 {images.slice(0, 6).map((im) => (
                   <figure key={im.id} className="group relative overflow-hidden rounded-lg">
-                    <img src={im.url} alt={im.label} className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <img src={im.url} alt={im.label} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     <figcaption className="absolute bottom-1.5 left-1.5 rounded bg-ink/75 px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-widest text-cream/85">{im.label}</figcaption>
                   </figure>
                 ))}

@@ -423,9 +423,9 @@ function populatePosterObjects(
       type: "linear",
       coords: { x1: 0, y1: 0, x2: 0, y2: height * 0.46 },
       colorStops: [
-        { offset: 0, color: "rgba(6, 10, 8, 0.72)" },
-        { offset: 0.5, color: "rgba(6, 10, 8, 0.35)" },
-        { offset: 1, color: "rgba(6, 10, 8, 0)" },
+        { offset: 0, color: "rgba(40, 88, 121, 0.72)" },
+        { offset: 0.5, color: "rgba(91, 170, 243, 0.35)" },
+        { offset: 1, color: "rgba(233, 118, 65, 0)" },
       ],
     }),
     selectable: false,

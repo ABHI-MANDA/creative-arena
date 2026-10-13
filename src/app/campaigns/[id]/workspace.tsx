@@ -738,28 +738,51 @@ export function CampaignWorkspace({
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [campaignStatus, setCampaignStatus] = useState<string>(campaign.status);
+  const [assetsList, setAssetsList] = useState<AssetLite[]>(assets);
+  const [approvingCampaign, setApprovingCampaign] = useState(false);
 
-  const editingAsset = assets.find((a) => a.id === editingAssetId) ?? null;
+  useEffect(() => {
+    setCampaignStatus(campaign.status);
+  }, [campaign.status]);
+
+  useEffect(() => {
+    setAssetsList((prev) =>
+      assets.map((serverAsset) => {
+        const local = prev.find((p) => p.id === serverAsset.id);
+        if (!local) return serverAsset;
+        return {
+          ...serverAsset,
+          approved: serverAsset.approved || (local.approved && campaignStatus === "approved"),
+        };
+      })
+    );
+  }, [assets, campaignStatus]);
+
+  const editingAsset = assetsList.find((a) => a.id === editingAssetId) ?? null;
 
   /* Open the Fabric editor for the given asset */
   const captureAndOpenEditor = (asset: AssetLite) => {
     setEditingAssetId(asset.id);
   };
 
-  const avg = assets.length ? Math.round(assets.reduce((s, a) => s + a.score, 0) / assets.length) : 0;
-  const readyCount = assets.filter((a) => a.status === "ready" || a.approved).length;
-  const improving = assets.filter((a) => a.status === "improving").length;
+  const avg = assetsList.length ? Math.round(assetsList.reduce((s, a) => s + a.score, 0) / assetsList.length) : 0;
+  const readyCount = assetsList.filter((a) => a.status === "ready" || a.approved).length;
+  const improving = assetsList.filter((a) => a.status === "improving").length;
+  const visualAssets = assetsList.filter((a) => a.kind !== "copy");
+  const approvedCount = assetsList.filter((a) => a.approved).length;
+  const allVisualApproved = visualAssets.length > 0 && visualAssets.every((a) => a.approved);
+  const isCampaignApproved = campaignStatus === "approved" || allVisualApproved;
 
-  const visualAssets = assets.filter((a) => a.kind !== "copy");
   const reels = visualAssets.filter((a) => a.kind === "reel");
   const stills = visualAssets.filter((a) => a.kind !== "reel");
-  const copyPack = assets.find((a) => a.kind === "copy");
+  const copyPack = assetsList.find((a) => a.kind === "copy");
 
   const filtered = platFilter === "all" ? stills : stills.filter((a) => a.aspect === platFilter || a.platform === platFilter);
 
-  const topAsset = useMemo(() => [...assets].sort((a, b) => b.score - a.score)[0], [assets]);
+  const topAsset = useMemo(() => [...assetsList].sort((a, b) => b.score - a.score)[0], [assetsList]);
   const [selectedId, setSelectedId] = useState<string>(topAsset?.id ?? "");
-  const selected = assets.find((a) => a.id === selectedId) ?? topAsset;
+  const selected = assetsList.find((a) => a.id === selectedId) ?? topAsset;
 
   const markBusy = (id: string, on: boolean) =>
     setBusy((s) => {
@@ -769,14 +792,52 @@ export function CampaignWorkspace({
     });
 
   const patchAsset = async (id: string, action: string) => {
+    const isApproved = action === "approve";
+    setAssetsList((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, approved: isApproved } : a))
+    );
     markBusy(id, true);
-    await fetch(`/api/assets/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    markBusy(id, false);
-    router.refresh();
+    try {
+      const res = await fetch(`/api/assets/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.campaignStatus) {
+        setCampaignStatus(data.campaignStatus);
+      }
+    } catch (err) {
+      console.error("patchAsset error", err);
+    } finally {
+      markBusy(id, false);
+      router.refresh();
+    }
+  };
+
+  const toggleApproveCampaign = async () => {
+    const nextApproved = !isCampaignApproved;
+    const nextStatus = nextApproved ? "approved" : "ready";
+    setCampaignStatus(nextStatus);
+    setAssetsList((prev) => prev.map((a) => ({ ...a, approved: nextApproved })));
+    setApprovingCampaign(true);
+    try {
+      const res = await fetch(`/api/campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: nextApproved ? "approve" : "unapprove" }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.ok) {
+        setCampaignStatus(data.status || nextStatus);
+        setAssetsList((prev) => prev.map((a) => ({ ...a, approved: nextApproved })));
+      }
+    } catch (err) {
+      console.error("toggleApproveCampaign error", err);
+    } finally {
+      setApprovingCampaign(false);
+      router.refresh();
+    }
   };
 
   const generateDraft = async () => {
@@ -910,16 +971,16 @@ export function CampaignWorkspace({
     { label: "Offer frames", count: stills.filter((a) => a.kind === "offer").length, present: stills.some((a) => a.kind === "offer") },
     { label: "Captions", count: copyPack?.payload.captions?.length ?? 0, present: Boolean(copyPack) },
     { label: "Hashtag set", count: copyPack?.payload.hashtags?.length ?? 0, present: Boolean(copyPack?.payload.hashtags?.length) },
-    { label: "Platform variants", count: new Set(assets.map((a) => a.platform)).size, present: assets.length > 0 },
+    { label: "Platform variants", count: new Set(assetsList.map((a) => a.platform)).size, present: assetsList.length > 0 },
   ];
 
   /* ---------------- pipeline intro ---------------- */
-  if (fresh && !revealed && assets.length > 0) {
+  if (fresh && !revealed && assetsList.length > 0) {
     return (
       <div className="pt-8">
         <PipelineOverlay
           campaignName={campaign.name}
-          assetCount={assets.length}
+          assetCount={assetsList.length}
           platforms={campaign.platforms}
           onDone={() => setRevealed(true)}
         />
@@ -928,7 +989,7 @@ export function CampaignWorkspace({
   }
 
   /* ---------------- draft: needs generation ---------------- */
-  if (assets.length === 0) {
+  if (assetsList.length === 0) {
     return (
       <>
         <ReviewContentModal
@@ -936,10 +997,12 @@ export function CampaignWorkspace({
           campaignId={campaign.id}
           property={{ ...property, cover: images[0] || null }}
           directionId={campaign.options[selectedDir]?.id || campaign.direction?.id || undefined}
+          directions={campaign.options}
           platformsCount={campaign.platforms.length}
           onClose={() => setReviewModalOpen(false)}
           onSuccess={() => {
             router.refresh();
+            window.location.reload();
           }}
         />
         <div className="mx-auto max-w-[1040px]">
@@ -992,15 +1055,17 @@ export function CampaignWorkspace({
         campaignId={campaign.id}
         property={{ ...property, cover: images[0] || null }}
         directionId={campaign.direction?.id || campaign.options[selectedDir]?.id || undefined}
+        directions={campaign.options}
         platformsCount={campaign.platforms.length}
         onClose={() => setReviewModalOpen(false)}
         onSuccess={() => {
           router.refresh();
+          window.location.reload();
         }}
       />
       {previewId && (
         <PreviewModal
-          assets={assets}
+          assets={assetsList}
           initialId={previewId}
           brand={brand}
           onClose={() => setPreviewId(null)}
@@ -1030,7 +1095,7 @@ export function CampaignWorkspace({
         <div className="flex flex-wrap items-start justify-between gap-5 px-7 py-6">
           <div>
             <div className="flex flex-wrap items-center gap-2.5">
-              <StatusPill status={campaign.status} />
+              <StatusPill status={isCampaignApproved ? "approved" : campaignStatus} />
               <Chip tone="gold">{campaign.presetLabel}</Chip>
               {campaign.direction && <Chip tone="mute">{campaign.direction.name}</Chip>}
             </div>
@@ -1052,15 +1117,34 @@ export function CampaignWorkspace({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={toggleApproveCampaign}
+              disabled={approvingCampaign}
+              className={cx(
+                "flex items-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold transition-all",
+                isCampaignApproved
+                  ? "border border-sage/40 bg-sage/15 text-sage hover:bg-sage/25 shadow-sm"
+                  : "btn-gold shadow-md shadow-gold/15"
+              )}
+              title={isCampaignApproved ? "Click to unapprove campaign deliverables" : "Approve all campaign deliverables"}
+            >
+              {approvingCampaign ? (
+                <Loader2 size={15} className="spin-slow" />
+              ) : (
+                <ShieldCheck size={15} className={isCampaignApproved ? "text-sage" : ""} />
+              )}
+              {isCampaignApproved ? "Campaign Approved ✓" : "Approve Campaign"}
+            </button>
             <button
               onClick={() => setReviewModalOpen(true)}
               className="flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-[13px] font-semibold text-gold transition hover:bg-gold/20"
+              title="Regenerate campaign through complete content review & AI pipeline"
             >
-              <Sparkles size={15} />
-              Review &amp; Edit Content
+              <RefreshCw size={15} />
+              Regenerate Campaign
             </button>
-            <button onClick={downloadPackage} disabled={packageBusy} className="btn-gold flex items-center gap-2 rounded-xl px-5 py-3 text-[13px] font-semibold disabled:opacity-60">
+            <button onClick={downloadPackage} disabled={packageBusy} className="btn-ghost flex items-center gap-2 rounded-xl border border-line px-4 py-3 text-[13px] font-semibold text-cream hover:border-gold/50 disabled:opacity-60">
               {packageBusy ? <Loader2 size={15} className="spin-slow" /> : <Package size={15} />}
               {packageBusy ? `Exporting ${exporting || "package"}` : "Download ZIP Package"}
             </button>
@@ -1068,10 +1152,10 @@ export function CampaignWorkspace({
         </div>
         <div className="grid grid-cols-2 divide-x divide-line border-t border-line sm:grid-cols-4">
           {[
-            { icon: LayoutGrid, label: "Deliverables", value: String(assets.length) },
+            { icon: LayoutGrid, label: "Deliverables", value: String(assetsList.length) },
             { icon: Gauge, label: "Avg QC score", value: String(avg) },
             { icon: BadgeCheck, label: "Ready to post", value: String(readyCount) },
-            { icon: ShieldCheck, label: "Approved", value: String(assets.filter((a) => a.approved).length) },
+            { icon: ShieldCheck, label: "Approved", value: String(approvedCount) },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-3 px-5 py-4">
               <s.icon size={16} className="text-gold" />
@@ -1085,8 +1169,16 @@ export function CampaignWorkspace({
       </div>
 
       {improving > 0 && (
-        <div className="anim-up mb-6 flex items-center gap-3 rounded-xl border border-rust/35 bg-rust/10 px-4 py-3 text-[12.5px] text-rust">
-          <RefreshCw size={14} /> {improving} asset{improving > 1 ? "s are" : " is"} below your review threshold — use Regenerate to re-compose with a fresh variant.
+        <div className="anim-up mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rust/35 bg-rust/10 px-4 py-3 text-[12.5px] text-rust">
+          <div className="flex items-center gap-2">
+            <RefreshCw size={14} /> {improving} asset{improving > 1 ? "s are" : " is"} below your review threshold — use Regenerate to re-compose with a fresh variant.
+          </div>
+          <button
+            onClick={() => setReviewModalOpen(true)}
+            className="btn-gold flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold"
+          >
+            <RefreshCw size={12} /> Regenerate Campaign
+          </button>
         </div>
       )}
 
@@ -1202,18 +1294,17 @@ export function CampaignWorkspace({
                             "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
                             a.approved ? "bg-sage/20 text-sage" : "border border-line bg-coal text-mute hover:border-sage/50 hover:text-sage"
                           )}
-                          title={a.approved ? "Approved" : "Approve asset"}
+                          title={a.approved ? "Approved (click to unapprove)" : "Approve asset"}
                         >
                           <BadgeCheck size={14} />
                         </button>
 
                         <button
-                          onClick={() => patchAsset(a.id, "regenerate")}
-                          disabled={busy.has(a.id)}
+                          onClick={() => setReviewModalOpen(true)}
                           className="flex h-7 w-7 items-center justify-center rounded-lg border border-line bg-coal text-mute transition-all hover:border-gold/50 hover:text-gold"
-                          title="Regenerate creative variant"
+                          title="Regenerate campaign (review content & generate)"
                         >
-                          {busy.has(a.id) ? <Loader2 size={13} className="spin-slow" /> : <RefreshCw size={13} />}
+                          <RefreshCw size={13} />
                         </button>
                       </div>
                     </div>

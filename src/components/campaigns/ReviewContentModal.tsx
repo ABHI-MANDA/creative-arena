@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, Check, Loader2, Sparkles, X } from "lucide-react";
-import type { ApprovedAdContent } from "@/lib/creative/engine";
+import { ArrowRight, Check, Loader2, Palette, Sparkles, X } from "lucide-react";
+import type { ApprovedAdContent, Direction } from "@/lib/creative/engine";
+import { cx } from "@/lib/utils";
 
 export function ReviewContentModal({
   campaignId,
   property,
   directionId,
+  directions,
   platformsCount = 4,
   isOpen,
   onClose,
@@ -16,24 +18,35 @@ export function ReviewContentModal({
   campaignId: string;
   property: { id: string; name: string; location: string; propertyType: string; price: string; cover?: string | null };
   directionId?: string;
+  directions?: Direction[];
   platformsCount?: number;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const [activeDirectionId, setActiveDirectionId] = useState(directionId || directions?.[0]?.id);
   const [contentDraft, setContentDraft] = useState<ApprovedAdContent | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const loadContent = async () => {
+  useEffect(() => {
+    if (directionId) {
+      setActiveDirectionId(directionId);
+    } else if (directions?.length && !activeDirectionId) {
+      setActiveDirectionId(directions[0].id);
+    }
+  }, [directionId, directions]);
+
+  const loadContent = async (targetDirId?: string) => {
+    const dirIdToUse = targetDirId ?? activeDirectionId ?? directionId ?? directions?.[0]?.id;
     setLoading(true);
     setError("");
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/prepare-content`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ directionId }),
+        body: JSON.stringify({ directionId: dirIdToUse }),
       });
       const data = (await res.json()) as { ok?: boolean; content?: ApprovedAdContent; error?: string };
       if (!res.ok || !data.content) throw new Error(data.error ?? "Failed to prepare ad content");
@@ -47,7 +60,8 @@ export function ReviewContentModal({
 
   useEffect(() => {
     if (isOpen) {
-      loadContent();
+      const initialDirId = activeDirectionId || directionId || directions?.[0]?.id;
+      loadContent(initialDirId);
     }
   }, [isOpen, campaignId]);
 
@@ -60,7 +74,7 @@ export function ReviewContentModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          directionId,
+          directionId: activeDirectionId,
           approvedContent: contentDraft,
         }),
       });
@@ -108,6 +122,37 @@ export function ReviewContentModal({
             <div className="grid gap-6 lg:grid-cols-12 items-start">
               {/* Left Column: Form */}
               <div className="lg:col-span-7 space-y-4">
+                {directions && directions.length > 0 && (
+                  <div className="rounded-xl border border-line/70 bg-panel/50 p-4 space-y-2.5">
+                    <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-gold font-semibold">
+                      <span className="flex items-center gap-1.5"><Palette size={12} /> Creative Direction</span>
+                      <span className="text-faint text-[9px]">Select Direction</span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {directions.map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveDirectionId(d.id);
+                            loadContent(d.id);
+                          }}
+                          className={cx(
+                            "rounded-lg p-2.5 text-left border transition-all text-xs",
+                            activeDirectionId === d.id
+                              ? "border-gold bg-gold/15 text-cream ring-1 ring-gold/40 shadow-sm"
+                              : "border-line bg-coal/70 text-mute hover:border-gold/40 hover:text-cream"
+                          )}
+                        >
+                          <div className="h-2 w-full rounded-sm mb-1.5" style={{ background: `linear-gradient(90deg, ${d.hex[0]}, ${d.hex[2] || d.hex[1]})` }} />
+                          <div className="font-semibold truncate text-[11.5px]">{d.name}</div>
+                          <div className="font-mono text-[9px] text-faint truncate">{d.tagline}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="rounded-xl border border-line/70 bg-panel/50 p-4.5 space-y-3.5">
                   <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-gold font-semibold">
                     <span>Ad Image Typography &amp; Content</span>
@@ -230,6 +275,35 @@ export function ReviewContentModal({
                     <span>Real-time Layout</span>
                   </div>
 
+                  <div className="flex flex-wrap gap-2 pt-0.5 pb-1">
+                    <label className="min-w-0 flex-1">
+                      <span className="label mb-1 block text-[9.5px]">Layout</span>
+                      <select
+                        value={contentDraft.layout ?? "automatic"}
+                        onChange={(e) => setContentDraft({ ...contentDraft, layout: e.target.value as ApprovedAdContent["layout"] })}
+                        className="input w-full text-[10.5px] py-1"
+                        aria-label="Preview layout"
+                      >
+                        <option value="automatic">Automatic for aspect ratio</option>
+                        <option value="poster">Poster</option>
+                        <option value="split">Split layout</option>
+                      </select>
+                    </label>
+                    <label className="min-w-0 flex-1">
+                      <span className="label mb-1 block text-[9.5px]">Design style</span>
+                      <select
+                        value={contentDraft.designStyle ?? "editorial"}
+                        onChange={(e) => setContentDraft({ ...contentDraft, designStyle: e.target.value as ApprovedAdContent["designStyle"] })}
+                        className="input w-full text-[10.5px] py-1"
+                        aria-label="Preview design style"
+                      >
+                        <option value="editorial">Editorial</option>
+                        <option value="minimal">Minimal</option>
+                        <option value="bold">Bold</option>
+                      </select>
+                    </label>
+                  </div>
+
                   <div
                     className="relative w-full rounded-lg overflow-hidden flex flex-col justify-between shadow-xl border border-line"
                     style={{
@@ -309,7 +383,7 @@ export function ReviewContentModal({
         {/* Footer */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 bg-panel2/60 px-6 py-4">
           <button
-            onClick={loadContent}
+            onClick={() => loadContent()}
             disabled={loading || submitting}
             className="btn-ghost rounded-xl px-4 py-2.5 text-[12px] text-cream/90 border border-line hover:border-gold/50"
           >
