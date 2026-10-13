@@ -3,5 +3,7 @@
   publish = ".next"
 
 [build.environment]
-  # Tell Netlify secrets scanner to ignore non-secret public model identifiers and API base URLs
-  SECRETS_SCAN_OMIT_KEYS = "IMAGE_API_BASE_URL,IMAGE_MODEL,OPENROUTER_MODEL"
+  # These endpoints and model identifiers are public configuration, not credentials.
+  SECRETS_SCAN_OMIT_KEYS = "AGNES_BASE_URL,AGNES_MODEL,AGNES_TEXT_MODEL,IMAGE_API_BASE_URL,IMAGE_MODEL,OPENROUTER_MODEL"
+  # Turbopack's build cache is not deployed; it can retain environment values between builds.
+  SECRETS_SCAN_OMIT_PATHS = ".netlify/.next/cache/**"
