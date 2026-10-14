@@ -385,7 +385,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
         <div
           className="ad-wide-scrim"
           style={{
-            background: `linear-gradient(90deg, ${dark}cc, transparent 35%), linear-gradient(180deg, transparent 65%, ${dark}77)`
+            background: `linear-gradient(180deg, rgba(52, 146, 201, 0.65) 0%, rgba(52, 146, 201, 0) 48%), linear-gradient(90deg, ${dark}cc, transparent 35%)`
           }}
         />
       </div>
@@ -423,11 +423,7 @@ export function AdCreative({
           <div
             className="ad-scrim"
             style={{
-              background: `
-                radial-gradient(ellipse at 50% 45%, transparent 22%, ${dark}33 100%),
-                linear-gradient(180deg, rgba(6,10,8,0.72) 0%, rgba(6,10,8,0.22) 28%, transparent 42%, rgba(4,8,6,0.52) 68%, rgba(3,6,5,0.95) 100%),
-                linear-gradient(112deg, ${accent}18, transparent 48%, ${dark}24)
-              `
+              background: "linear-gradient(180deg, rgba(52, 146, 201, 0.65) 0%, rgba(52, 146, 201, 0) 48%)"
             }}
           />
           {/* Subtle color grading layer tying visual into project Creative DNA */}

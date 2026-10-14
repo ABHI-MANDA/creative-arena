@@ -187,20 +187,12 @@ function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Prom
       } catch {}
     }
 
-    // 3. Dual gradient scrims for high contrast and readability
+    // 3. Blue top scrim for contrast, fading out before the image focal area
     const topGradient = ctx.createLinearGradient(0, 0, 0, height * 0.45);
-    topGradient.addColorStop(0, "rgba(8, 17, 14, 0.72)");
-    topGradient.addColorStop(0.5, "rgba(8, 17, 14, 0.25)");
-    topGradient.addColorStop(1, "rgba(8, 17, 14, 0)");
+    topGradient.addColorStop(0, "rgba(52, 146, 201, 0.65)");
+    topGradient.addColorStop(1, "rgba(52, 146, 201, 0)");
     ctx.fillStyle = topGradient;
     ctx.fillRect(0, 0, width, height * 0.45);
-
-    const btmGradient = ctx.createLinearGradient(0, height * 0.38, 0, height);
-    btmGradient.addColorStop(0, "rgba(4, 10, 7, 0)");
-    btmGradient.addColorStop(0.5, "rgba(4, 10, 7, 0.65)");
-    btmGradient.addColorStop(1, "rgba(4, 10, 7, 0.94)");
-    ctx.fillStyle = btmGradient;
-    ctx.fillRect(0, height * 0.38, width, height * 0.62);
 
     // 4. Overlays & Typography
     const margin = 54;
