@@ -126,7 +126,7 @@ export function AssetLibrary({
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((i, idx) => (
-              <div key={i.id} className="anim-up panel panel-hover overflow-hidden rounded-2xl border border-line bg-coal" style={{ animationDelay: `${Math.min(idx, 10) * 40}ms` }}>
+              <div key={i.id} className="anim-up panel panel-hover overflow-hidden rounded-2xl border border-line bg-coal" style={{ animationDelay: `${Math.min(idx, 10) * 40}ms` }} suppressHydrationWarning>
                 {/* TOP TOOLBAR HEADER */}
                 <div className="border-b border-line bg-panel/90 px-3.5 py-3 backdrop-blur space-y-2">
                   <div className="flex items-center justify-between gap-2">

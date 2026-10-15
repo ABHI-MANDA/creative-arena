@@ -9,6 +9,16 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "platform-outputs.agnes-ai.space",
+      },
+      {
+        protocol: "https",
+        hostname: "thecitysarjapur.com",
+      },
+    ],
   },
   async headers() {
     return [

@@ -6,6 +6,7 @@
  * ------------------------------------------------------------------ */
 
 import { KIND_LABELS, PLATFORM_KINDS, platformById, presetById, QC_CHECKLIST, type BrandSettings } from "./presets";
+import type { CreativeDesignStyle } from "./style-config";
 
 export type Brief = {
   name: string;
@@ -75,7 +76,7 @@ export type AssetPayload = {
   imagePrompt?: string;
   hex?: string[];
   layout?: "overlay" | "wide";
-  designStyle?: "editorial" | "minimal" | "bold";
+  designStyle?: CreativeDesignStyle;
   fontSizes?: AdFontSizes;
   shots?: Shot[];
   hook?: string;
@@ -205,12 +206,12 @@ export function directionsFor(dna: DNA, brief: Brief): Direction[] {
       name: "Golden Hour Cinema",
       tagline: "Warm · Premium · Cinematic",
       description:
-        `Dusk exteriors and glowing interiors, slow camera move-outs, champagne light. Leads with ${dna.positioning.toLowerCase()}.`,
-      approach: ["Dusk-reveal hero frames", "Slow 24fps camera language", "Champagne & obsidian grade", "Serif-led typography"],
+        `Warm late-afternoon exteriors and naturally glowing interiors, slow camera move-outs, champagne light with open shadow detail. Leads with ${dna.positioning.toLowerCase()}.`,
+      approach: ["Warm daylight hero frames", "Slow 24fps camera language", "Champagne & warm slate grade", "Serif-led typography"],
       hex: ["#0B0A08", "#D9AB5E", "#8C6B4A"],
       tint: "rgba(217,171,94,0.16)",
       music: "Warm cinematic piano · 92 BPM · soft rise",
-      grade: "Amber lift, crushed blacks, halation on highlights",
+      grade: "Balanced amber highlights, natural exposure, lifted shadows with architectural detail",
     },
     {
       id: "bright-living-story",
@@ -234,7 +235,7 @@ export function directionsFor(dna: DNA, brief: Brief): Direction[] {
       hex: ["#111112", "#ECECE8", "#8A8A86"],
       tint: "rgba(236,236,232,0.08)",
       music: "Sparse ambient keys · 80 BPM · reverbed",
-      grade: "Neutral mono, micro-contrast, matte blacks",
+      grade: "Neutral mono, restrained micro-contrast, open shadows with visible detail",
     },
   ];
 }
@@ -736,7 +737,7 @@ export type ApprovedAdContent = {
   cta: string;
   imagePrompt: string;
   layout?: "automatic" | "poster" | "split";
-  designStyle?: "editorial" | "minimal" | "bold";
+  designStyle?: CreativeDesignStyle;
   fontSizes?: AdFontSizes;
   captions?: {
     instagram?: string;

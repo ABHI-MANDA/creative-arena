@@ -19,7 +19,7 @@ export function PipelineOverlay({
 }) {
   const steps: Step[] = [
     { label: "AI analyzing property", lines: ["Reading Creative DNA…", "Matching reference architecture", "Locking structure-preservation profile"] },
-    { label: "Building creative direction", lines: ["Direction: Golden Hour Cinema", "Grade: amber lift, crushed blacks", "Typography: serif-led lock-up"] },
+    { label: "Building creative direction", lines: ["Direction: Golden Hour Cinema", "Grade: warm highlights, open shadow detail", "Typography: serif-led lock-up"] },
     { label: "Generating visuals", lines: [`Enhancing ${platforms.length} platform masters`, "Reference-preserving renders", "Sky, lighting & atmosphere passes"] },
     { label: "Composing ad system", lines: [`Laying out ${assetCount} deliverables`, "Safe zones + brand lock-up applied", "Copy pack + hashtags written"] },
     { label: "Brand ad quality check", lines: ["11-point QC sweep", "Structure, claims, readability…", "Thresholds applied from Brand Kit"] },

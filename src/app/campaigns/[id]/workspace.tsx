@@ -38,6 +38,7 @@ import { QualityPanel } from "@/components/quality";
 import { Storyboard } from "@/components/storyboard";
 import { Chip, DynIcon, SectionHead, StatusPill } from "@/components/ui";
 import { ReviewContentModal } from "@/components/campaigns/ReviewContentModal";
+import { resolveCreativeStyle } from "@/lib/creative/style-config";
 
 const CreativeEditorModal = dynamic(
   () => import("@/components/editor/CreativeEditorModal").then((mod) => mod.CreativeEditorModal),
@@ -146,6 +147,7 @@ function getTargetDimensions(aspect: string): { width: number; height: number } 
 function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Promise<Blob> {
   return new Promise(async (resolve) => {
     const { width, height } = getTargetDimensions(asset.aspect);
+    const style = resolveCreativeStyle(asset.payload.hex, asset.payload.designStyle);
 
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -158,7 +160,7 @@ function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Prom
     }
 
     // 1. Dark base
-    ctx.fillStyle = "#12100c";
+    ctx.fillStyle = style.canvasExport.background;
     ctx.fillRect(0, 0, width, height);
 
     // 2. Draw property photo background
@@ -176,7 +178,9 @@ function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Prom
                 const scale = Math.max(width / imgW, height / imgH);
                 const x = (width - imgW * scale) / 2;
                 const y = (height - imgH * scale) / 2;
+                ctx.filter = style.image.filter;
                 ctx.drawImage(img, x, y, imgW * scale, imgH * scale);
+                ctx.filter = "none";
               } catch {}
               resImg();
             };
@@ -187,10 +191,10 @@ function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Prom
       } catch {}
     }
 
-    // 3. Blue top scrim for contrast, fading out before the image focal area
+    // 3. Blue top scrim fades out before the image focal area.
     const topGradient = ctx.createLinearGradient(0, 0, 0, height * 0.45);
-    topGradient.addColorStop(0, "rgba(52, 146, 201, 0.65)");
-    topGradient.addColorStop(1, "rgba(52, 146, 201, 0)");
+    topGradient.addColorStop(0, style.canvasExport.topScrimColor);
+    topGradient.addColorStop(1, style.canvasExport.topScrimFade);
     ctx.fillStyle = topGradient;
     ctx.fillRect(0, 0, width, height * 0.45);
 
@@ -200,15 +204,15 @@ function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Prom
 
     let topY = 70;
     if (p.kicker) {
-      ctx.fillStyle = "#d9ab5e";
-      ctx.font = "bold 20px sans-serif";
+      ctx.fillStyle = style.colors.accent;
+      ctx.font = `bold 20px ${style.typography.sans}`;
       ctx.fillText(p.kicker.toUpperCase(), margin, topY);
       topY += 42;
     }
 
     if (p.headline) {
-      ctx.fillStyle = "#fffdf5";
-      ctx.font = "500 52px serif";
+      ctx.fillStyle = style.colors.text;
+      ctx.font = `500 52px ${style.typography.display}`;
       const words = p.headline.split(" ");
       let line = "";
       for (const w of words) {
@@ -228,8 +232,8 @@ function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Prom
     }
 
     if (p.subline) {
-      ctx.fillStyle = "rgba(244, 238, 225, 0.92)";
-      ctx.font = "24px sans-serif";
+      ctx.fillStyle = style.colors.mutedText;
+      ctx.font = `24px ${style.typography.sans}`;
       ctx.fillText(p.subline, margin, topY);
     }
 
@@ -237,44 +241,44 @@ function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Prom
 
     if (p.cta) {
       const ctaText = (p.cta && !p.cta.toLowerCase().includes("1234567890") && !/\d{8,}/.test(p.cta) ? p.cta : "BOOK NOW").toUpperCase();
-      ctx.font = "bold 22px sans-serif";
+      ctx.font = `bold 22px ${style.typography.sans}`;
       const ctaW = ctx.measureText(ctaText).width + 48;
       const ctaH = 50;
       const ctaX = width - margin - ctaW;
       const ctaY = btmY - 38;
 
-      ctx.fillStyle = "#d9ab5e";
+      ctx.fillStyle = style.colors.ctaBackground;
       ctx.beginPath();
       ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 25);
       ctx.fill();
 
-      ctx.fillStyle = "#171208";
+      ctx.fillStyle = style.colors.ctaForeground;
       ctx.fillText(ctaText, ctaX + 24, ctaY + 33);
     }
 
     if (p.priceLine) {
-      ctx.fillStyle = "#fffdf5";
-      ctx.font = "bold 38px serif";
+      ctx.fillStyle = style.colors.text;
+      ctx.font = `bold 38px ${style.typography.display}`;
       ctx.fillText(p.priceLine, margin, btmY);
       btmY -= 54;
     }
 
     if (p.locationLabel) {
-      ctx.fillStyle = "rgba(244, 238, 225, 0.92)";
-      ctx.font = "22px sans-serif";
+      ctx.fillStyle = style.colors.mutedText;
+      ctx.font = `22px ${style.typography.sans}`;
       ctx.fillText("📍  " + p.locationLabel, margin, btmY);
       btmY -= 45;
     }
 
     const bullets = (p.bullets ?? []).slice(0, 3);
     if (bullets.length > 0 && btmY > topY + 80) {
-      ctx.font = "18px sans-serif";
+      ctx.font = `18px ${style.typography.sans}`;
       let bulletX = margin;
       for (const bullet of bullets) {
         const bText = "• " + bullet;
         const bW = ctx.measureText(bText).width + 20;
         if (bulletX + bW < width - margin) {
-          ctx.fillStyle = "rgba(244, 238, 225, 0.85)";
+          ctx.fillStyle = style.colors.mutedText;
           ctx.fillText(bText, bulletX, btmY);
           bulletX += bW;
         }

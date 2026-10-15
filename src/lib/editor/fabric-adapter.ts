@@ -5,6 +5,7 @@ import * as fabric from "fabric";
 
 import type { AssetPayload } from "@/lib/creative/engine";
 import type { BrandSettings } from "@/lib/creative/presets";
+import { CREATIVE_STYLE_CONFIG, resolveCreativeStyle } from "@/lib/creative/style-config";
 
 export type FontOption = {
   name: string;
@@ -35,6 +36,62 @@ export type ObjectMeta = {
   aiGenerated: boolean;
   userModified?: boolean;
 };
+
+export function syncGeneratedImageGradient(
+  canvas: fabric.Canvas,
+  layout: "poster" | "wide",
+  width: number,
+  height: number,
+  topScrimColor = CREATIVE_STYLE_CONFIG.canvasExport.topScrimColor,
+  topScrimFade = CREATIVE_STYLE_CONFIG.canvasExport.topScrimFade
+) {
+  const left = layout === "wide"
+    ? Math.round(width * (parseFloat(CREATIVE_STYLE_CONFIG.layout.widePanelWidth) / 100))
+    : 0;
+  const gradientWidth = width - left;
+  const gradientHeight = height * 0.48;
+  const gradientIds = new Set(["scrim-poster", "scrim-wide"]);
+
+  for (const object of canvas.getObjects().filter((item) => {
+    const meta = (item as unknown as { meta?: ObjectMeta }).meta;
+    return meta !== undefined && gradientIds.has(meta.id);
+  })) {
+    canvas.remove(object);
+  }
+  for (const object of canvas.getObjects()) {
+    const meta = (object as unknown as { meta?: ObjectMeta }).meta;
+    if (meta?.id === "cta-bg") object.set("fill", CREATIVE_STYLE_CONFIG.colors.ctaBackground);
+  }
+
+  const scrim = new fabric.Rect({
+    left,
+    top: 0,
+    width: gradientWidth,
+    height: gradientHeight,
+    fill: new fabric.Gradient({
+      type: "linear",
+      coords: { x1: 0, y1: 0, x2: 0, y2: gradientHeight },
+      colorStops: [
+        { offset: 0, color: topScrimColor },
+        { offset: 1, color: topScrimFade },
+      ],
+    }),
+    selectable: false,
+    evented: false,
+  });
+  (scrim as unknown as { meta: ObjectMeta }).meta = {
+    id: layout === "wide" ? "scrim-wide" : "scrim-poster",
+    name: "Top ambient contrast scrim",
+    editable: false,
+    locked: true,
+    deletable: false,
+    visible: true,
+    category: "shape",
+    aiGenerated: true,
+  };
+
+  canvas.insertAt(Math.min(1, canvas.getObjects().length), scrim);
+}
 
 export function getCanvasDimensions(aspect: string): { width: number; height: number } {
   const norm = (aspect || "1:1").trim();
@@ -69,6 +126,7 @@ export function populateEditableOverlays(
   kind: string = "hero",
   platform: string = "instagram"
 ) {
+  const style = resolveCreativeStyle(payload.hex, payload.designStyle);
   const { width: W, height: H } = getCanvasDimensions(aspect);
   const cqw = W / 100; // 1 container-query width unit in pixels
 
@@ -105,15 +163,22 @@ export function populateEditableOverlays(
 
   const isWide = payload.layout
     ? payload.layout === "wide"
-    : kind !== "hero" && (
-        ["linkedin", "portal"].includes(platform) ||
-        aspect === "16:9"
-      );
+    : ["linkedin", "portal"].includes(platform);
+
+  const panelW = Math.round(W * (parseFloat(style.layout.widePanelWidth) / 100));
 
   // ─────────────────────────────────────────────────────────────
   // LUXURY REAL-ESTATE POSTER LAYOUT (PosterBody in ad-creative.tsx)
   // ─────────────────────────────────────────────────────────────
   if (!isWide) {
+    syncGeneratedImageGradient(
+      canvas,
+      "poster",
+      W,
+      H,
+      style.canvasExport.topScrimColor,
+      style.canvasExport.topScrimFade
+    );
     populatePosterObjects(canvas, payload, brand, W, H);
     return;
   }
@@ -122,7 +187,14 @@ export function populateEditableOverlays(
   // WIDE SPLIT LAYOUT (linkedin / portal / 16:9)
   // ─────────────────────────────────────────────────────────────
   if (isWide) {
-    const panelW = Math.round(W * 0.46);
+    syncGeneratedImageGradient(
+      canvas,
+      "wide",
+      W,
+      H,
+      style.canvasExport.topScrimColor,
+      style.canvasExport.topScrimFade
+    );
     const lm = 2.6 * cqw;
     const innerW = panelW - 2 * lm;
     let topY = 1.4 * cqw;
@@ -133,7 +205,7 @@ export function populateEditableOverlays(
         metaId: "text-kicker", metaName: "Kicker",
         left: lm, top: topY, width: innerW,
         fontSize: fs, fontFamily: "monospace", fontWeight: "bold",
-        fill: "#d9ab5e", charSpacing: 320,
+        fill: style.colors.accent, charSpacing: 320,
       });
       topY += calcTextHeight(payload.kicker, fs, innerW) + 1 * cqw;
     }
@@ -143,7 +215,7 @@ export function populateEditableOverlays(
         metaId: "text-headline", metaName: "Headline",
         left: lm, top: topY, width: innerW,
         fontSize: fs, fontFamily: "'Playfair Display', serif",
-        fill: "#fffdf5", lineHeight: 1.06,
+        fill: style.colors.text, lineHeight: 1.06,
       });
       topY += calcTextHeight(payload.headline, fs, innerW) + 1 * cqw;
     }
@@ -153,7 +225,7 @@ export function populateEditableOverlays(
         metaId: "text-subline", metaName: "Subline",
         left: lm, top: topY, width: innerW,
         fontSize: fs, fontFamily: "Inter, sans-serif",
-        fill: "rgba(244,238,225,0.85)",
+        fill: style.colors.mutedText,
       });
       topY += calcTextHeight(payload.subline, fs, innerW) + 1 * cqw;
     }
@@ -163,7 +235,7 @@ export function populateEditableOverlays(
         metaId: `text-bullet-${i}`, metaName: `Bullet ${i + 1}`,
         left: lm, top: topY, width: innerW,
         fontSize: fs, fontFamily: "Inter, sans-serif",
-        fill: "rgba(244,238,225,0.9)",
+        fill: style.colors.mutedText,
       });
       topY += calcTextHeight(`•  ${b}`, fs, innerW) + 0.7 * cqw;
     });
@@ -173,7 +245,7 @@ export function populateEditableOverlays(
         metaId: "text-price", metaName: "Price",
         left: lm, top: H - 5 * cqw, width: innerW * 0.7,
         fontSize: fs, fontFamily: "'Playfair Display', serif",
-        fill: "#ecd9ac",
+        fill: style.colors.light,
       });
     }
     if (payload.cta) {
@@ -183,7 +255,7 @@ export function populateEditableOverlays(
         left: lm, top: H - 3.5 * cqw - fs - 2 * cqw,
         width: ctaW, height: fs + 2.2 * cqw,
         rx: (fs + 2.2 * cqw) / 2, ry: (fs + 2.2 * cqw) / 2,
-        fill: "#ffffff", backgroundColor: "transparent",
+        fill: style.colors.ctaBackground, backgroundColor: "transparent",
       });
       (ctaBg as unknown as { meta: ObjectMeta }).meta = meta("cta-bg", "CTA Button", "shape");
       canvas.add(ctaBg);
@@ -192,7 +264,7 @@ export function populateEditableOverlays(
         left: lm + ctaW / 2, top: H - 3.5 * cqw - fs - 2 * cqw + 1.1 * cqw,
         originX: "center", width: ctaW, textAlign: "center",
         fontSize: fs, fontFamily: "Inter, sans-serif",
-        fontWeight: "bold", fill: "#171208",
+        fontWeight: "bold", fill: style.colors.ctaForeground,
       });
     }
     return;
@@ -395,6 +467,7 @@ function populatePosterObjects(
   width: number,
   height: number
 ) {
+  const style = resolveCreativeStyle(payload.hex, payload.designStyle);
   const cqw = width / 100;
   const { developer, project } = parseDeveloperAndProject(payload.kicker, payload.headline, brand.name);
   const bhk = parseBhk(payload.subline, payload.kicker);
@@ -413,36 +486,6 @@ function populatePosterObjects(
   const price = payload.priceLine ?? "";
   const contactText = payload.cta?.toUpperCase() ?? "";
 
-  // 1. Ambient Top Scrim for crisp text contrast against sky/foliage
-  const scrim = new fabric.Rect({
-    left: 0,
-    top: 0,
-    width,
-    height: height * 0.46,
-    fill: new fabric.Gradient({
-      type: "linear",
-      coords: { x1: 0, y1: 0, x2: 0, y2: height * 0.46 },
-      colorStops: [
-        { offset: 0, color: "rgba(40, 88, 121, 0.72)" },
-        { offset: 0.5, color: "rgba(91, 170, 243, 0.35)" },
-        { offset: 1, color: "rgba(233, 118, 65, 0)" },
-      ],
-    }),
-    selectable: false,
-    evented: false,
-  });
-  (scrim as unknown as { meta: ObjectMeta }).meta = {
-    id: "scrim-poster",
-    name: "Poster Scrim",
-    editable: false,
-    locked: true,
-    deletable: true,
-    visible: true,
-    category: "shape",
-    aiGenerated: true,
-  };
-  canvas.add(scrim);
-
   let currentTop = Math.max(28, 3.8 * cqw);
 
   // 2. Developer / Brand Name
@@ -454,9 +497,9 @@ function populatePosterObjects(
     width: width * 0.9,
     textAlign: "center",
     fontSize: devFs,
-    fontFamily: "Inter, sans-serif",
+    fontFamily: style.typography.sans,
     fontWeight: "bold",
-    fill: "#ffffff",
+    fill: style.colors.text,
     charSpacing: 180,
   });
   (devText as unknown as { meta: ObjectMeta }).meta = {
@@ -481,9 +524,9 @@ function populatePosterObjects(
     width: width * 0.92,
     textAlign: "center",
     fontSize: projFs,
-    fontFamily: "Inter, sans-serif",
+    fontFamily: style.typography.sans,
     fontWeight: "800",
-    fill: "#ffffff",
+    fill: style.colors.text,
     charSpacing: 60,
     lineHeight: 1.02,
   });
@@ -509,9 +552,9 @@ function populatePosterObjects(
     width: width * 0.88,
     textAlign: "center",
     fontSize: tagFs,
-    fontFamily: "Inter, sans-serif",
+    fontFamily: style.typography.sans,
     fontWeight: "600",
-    fill: "rgba(255, 255, 255, 0.95)",
+    fill: style.colors.mutedText,
     charSpacing: 160,
   });
   (tagText as unknown as { meta: ObjectMeta }).meta = {
@@ -559,9 +602,9 @@ function populatePosterObjects(
     width: width * 0.88,
     textAlign: "center",
     fontSize: bhkFs,
-    fontFamily: "Inter, sans-serif",
+    fontFamily: style.typography.sans,
     fontWeight: "900",
-    fill: "#ffffff",
+    fill: style.colors.text,
     lineHeight: 1.0,
   });
   (bhkText as unknown as { meta: ObjectMeta }).meta = {
@@ -586,9 +629,9 @@ function populatePosterObjects(
     width: width * 0.88,
     textAlign: "center",
     fontSize: locFs,
-    fontFamily: "Inter, sans-serif",
+    fontFamily: style.typography.sans,
     fontWeight: "600",
-    fill: "rgba(255, 255, 255, 0.95)",
+    fill: style.colors.mutedText,
     charSpacing: 220,
   });
   (locText as unknown as { meta: ObjectMeta }).meta = {
@@ -613,9 +656,9 @@ function populatePosterObjects(
     width: width * 0.92,
     textAlign: "center",
     fontSize: amenFs,
-    fontFamily: "Inter, sans-serif",
+    fontFamily: style.typography.sans,
     fontWeight: "500",
-    fill: "rgba(255, 255, 255, 0.90)",
+    fill: style.colors.mutedText,
     charSpacing: 120,
   });
   (amenText as unknown as { meta: ObjectMeta }).meta = {
@@ -640,9 +683,9 @@ function populatePosterObjects(
     width: width * 0.8,
     textAlign: "center",
     fontSize: priceLabelFs,
-    fontFamily: "Inter, sans-serif",
+    fontFamily: style.typography.sans,
     fontWeight: "600",
-    fill: "rgba(255, 255, 255, 0.85)",
+    fill: style.colors.mutedText,
     charSpacing: 200,
   });
   (startLabel as unknown as { meta: ObjectMeta }).meta = {
@@ -666,9 +709,9 @@ function populatePosterObjects(
     width: width * 0.8,
     textAlign: "center",
     fontSize: priceFs,
-    fontFamily: "Inter, sans-serif",
+    fontFamily: style.typography.sans,
     fontWeight: "900",
-    fill: "#ffffff",
+    fill: style.colors.text,
     lineHeight: 1.0,
   });
   (priceText as unknown as { meta: ObjectMeta }).meta = {
@@ -692,7 +735,7 @@ function populatePosterObjects(
     top: callBarTop,
     width,
     height: callBarH,
-    fill: "#ffffff",
+    fill: style.colors.ctaBackground,
     selectable: false,
   });
   (callBarBg as unknown as { meta: ObjectMeta }).meta = {
@@ -715,9 +758,9 @@ function populatePosterObjects(
     width: width - 20,
     textAlign: "center",
     fontSize: callFs,
-    fontFamily: "Inter, sans-serif",
+    fontFamily: style.typography.sans,
     fontWeight: "bold",
-    fill: "#0c120e",
+    fill: style.colors.ctaForeground,
     charSpacing: 60,
   });
   (callTextObj as unknown as { meta: ObjectMeta }).meta = {
@@ -742,13 +785,14 @@ export function populateDefaultFabricObjects(
   platform: string = "instagram"
 ) {
   const { width, height } = getCanvasDimensions(aspect);
+  const style = resolveCreativeStyle(payload.hex, payload.designStyle);
 
   const isWide = payload.layout
     ? payload.layout === "wide"
     : ["linkedin", "portal"].includes(platform) || aspect === "16:9";
 
   if (isWide) {
-    const panelWidth = Math.round(width * 0.46);
+    const panelWidth = Math.round(width * (parseFloat(style.layout.widePanelWidth) / 100));
     const leftMargin = 50;
     const contentWidth = panelWidth - leftMargin - 30;
 
@@ -758,8 +802,8 @@ export function populateDefaultFabricObjects(
       top: 0,
       width: panelWidth,
       height: height,
-      fill: "#14110c",
-      stroke: "rgba(217, 171, 94, 0.25)",
+      fill: style.colors.background,
+      stroke: `${style.colors.accent}40`,
       strokeWidth: 1,
       selectable: false,
       evented: false,
@@ -787,7 +831,7 @@ export function populateDefaultFabricObjects(
         fontSize: 20,
         fontFamily: "Inter, sans-serif",
         fontWeight: "bold",
-        fill: "#d9ab5e",
+        fill: style.colors.text,
         charSpacing: 160,
       });
       (kicker as unknown as { meta: ObjectMeta }).meta = {
@@ -811,9 +855,9 @@ export function populateDefaultFabricObjects(
         top: currentTop,
         width: contentWidth,
         fontSize: 42,
-        fontFamily: "'Playfair Display', serif",
+        fontFamily: style.typography.display,
         fontWeight: "normal",
-        fill: "#fffdf5",
+        fill: style.colors.text,
         lineHeight: 1.15,
       });
       (headline as unknown as { meta: ObjectMeta }).meta = {
@@ -839,7 +883,7 @@ export function populateDefaultFabricObjects(
         fontSize: 22,
         fontFamily: "Inter, sans-serif",
         fontWeight: "normal",
-        fill: "rgba(244, 238, 225, 0.9)",
+        fill: style.colors.mutedText,
       });
       (subline as unknown as { meta: ObjectMeta }).meta = {
         id: "text-subline",
@@ -866,7 +910,7 @@ export function populateDefaultFabricObjects(
           fontSize: 18,
           fontFamily: "Inter, sans-serif",
           fontWeight: "bold",
-          fill: "rgba(244, 238, 225, 0.9)",
+          fill: style.colors.mutedText,
         });
         (bText as unknown as { meta: ObjectMeta }).meta = {
           id: `text-bullet-${idx}`,
@@ -893,7 +937,7 @@ export function populateDefaultFabricObjects(
           width: contentWidth,
           fontSize: 18,
           fontFamily: "Inter, sans-serif",
-          fill: "rgba(244, 238, 225, 0.92)",
+          fill: style.colors.mutedText,
         });
         (rText as unknown as { meta: ObjectMeta }).meta = {
           id: `text-row-${idx}`,
@@ -919,7 +963,7 @@ export function populateDefaultFabricObjects(
         height: 52,
         rx: 26,
         ry: 26,
-        fill: "#d9ab5e",
+        fill: style.colors.ctaBackground,
       });
       (ctaBg as unknown as { meta: ObjectMeta }).meta = {
         id: "cta-bg",
@@ -942,7 +986,7 @@ export function populateDefaultFabricObjects(
         fontSize: 18,
         fontFamily: "Inter, sans-serif",
         fontWeight: "bold",
-        fill: "#171208",
+        fill: style.colors.ctaForeground,
       });
       (ctaText as unknown as { meta: ObjectMeta }).meta = {
         id: "text-cta",
@@ -964,9 +1008,9 @@ export function populateDefaultFabricObjects(
         top: height - 112,
         width: contentWidth - 260,
         fontSize: 28,
-        fontFamily: "'Playfair Display', serif",
+        fontFamily: style.typography.display,
         fontWeight: "bold",
-        fill: "#ecd9ac",
+        fill: style.colors.light,
       });
       (price as unknown as { meta: ObjectMeta }).meta = {
         id: "text-price",

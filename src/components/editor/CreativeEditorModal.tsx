@@ -45,9 +45,11 @@ import {
   FONT_LIBRARY,
   getCanvasDimensions,
   populateDefaultFabricObjects,
+  syncGeneratedImageGradient,
   type ObjectMeta,
 } from "@/lib/editor/fabric-adapter";
 import { cx } from "@/lib/utils";
+import { resolveCreativeStyle } from "@/lib/creative/style-config";
 
 export type AdAssetLike = {
   id: string;
@@ -404,6 +406,22 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
               if (isCancelled || !fabricCanvasRef.current) return;
               await canvas.loadFromJSON(designData);
               if (isCancelled || !fabricCanvasRef.current) return;
+              const currentAsset = assetRef.current;
+              const isWide = currentAsset.payload.layout
+                ? currentAsset.payload.layout === "wide"
+                : ["linkedin", "portal"].includes(currentAsset.platform);
+              const creativeStyle = resolveCreativeStyle(
+                currentAsset.payload.hex,
+                currentAsset.payload.designStyle
+              );
+              syncGeneratedImageGradient(
+                canvas,
+                isWide ? "wide" : "poster",
+                targetWidth,
+                targetHeight,
+                creativeStyle.canvasExport.topScrimColor,
+                creativeStyle.canvasExport.topScrimFade
+              );
               constrainCanvasObjects(canvas);
               const curScale = effectiveScaleRef.current;
               canvas.setDimensions({

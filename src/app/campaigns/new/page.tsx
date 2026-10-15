@@ -10,6 +10,7 @@ import { AssetVisual } from "@/components/ad-creative";
 import { DynIcon } from "@/components/ui";
 import { aspectCss, cx, ratioOf } from "@/lib/utils";
 import type { OpenRouterModel } from "@/lib/creative/models";
+import { CREATIVE_DESIGN_STYLES } from "@/lib/creative/style-config";
 
 type PropertyLite = {
   id: string;
@@ -641,9 +642,9 @@ function CampaignWizard() {
                       className="input w-full text-[11px]"
                       aria-label="Preview design style"
                     >
-                      <option value="editorial">Editorial</option>
-                      <option value="minimal">Minimal</option>
-                      <option value="bold">Bold</option>
+                      {CREATIVE_DESIGN_STYLES.map((style) => (
+                        <option key={style.value} value={style.value}>{style.label}</option>
+                      ))}
                     </select>
                   </label>
                 </div>

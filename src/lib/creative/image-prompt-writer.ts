@@ -46,7 +46,7 @@ function aspectComposition(aspectRatio?: string): string {
 function finishPrompt(prompt: string, aspectRatio?: string): string {
   const constraints = [
     aspectRatio ? aspectComposition(aspectRatio) : "",
-    "Do not render text, letters, numbers, logos, signs, watermarks, or graphic overlays",
+    "Do not render text, letters, numbers, logos, signs, watermarks, or graphic overlays; use even natural exposure across the full frame, preserve visible shadow detail, and avoid vignettes, dark fades, black gradients, or crushed blacks",
     "Use only the supplied property facts and plausible architecture",
     "photorealistic premium real-estate advertising photography",
   ].filter(Boolean).join("; ");
@@ -75,11 +75,11 @@ const KIND_PHOTOGRAPHY: Record<string, string> = {
 /* Photography style per creative direction */
 const DIRECTION_STYLE: Record<string, string> = {
   "golden-hour-cinema":
-    "dusk golden-hour warm amber 2800K glow, champagne bokeh highlights, warm tungsten interior wash, film-grade cinematic halation, crushed charcoal blacks, luxury evening ambiance",
+    "warm late-afternoon sunlight, balanced amber highlights, champagne reflections, gentle interior warmth, premium cinematic atmosphere with open, detailed shadows and natural exposure",
   "bright-living-story":
     "clean crisp morning 5500K daylight, airy lifted whites, soft natural window bounce, sage green and travertine tones, minimal shadows, fresh approachable luxury feel",
   "form-and-structure":
-    "sculptural architectural editorial, high-contrast chiaroscuro, monochrome and warm titanium tones, sharp geometric shadow lines, macro concrete and timber materiality, matte blacks",
+    "sculptural architectural editorial, balanced monochrome and warm titanium tones, defined geometric shadows with visible detail, macro concrete and timber materiality, open shadow exposure",
 };
 
 function systemPrompt(context?: ImagePromptContext): string {

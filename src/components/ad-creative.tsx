@@ -1,10 +1,13 @@
+import type { CSSProperties } from "react";
 import type { AdTextSection, AssetPayload } from "@/lib/creative/engine";
-import Image from "next/image";
 import type { BrandSettings } from "@/lib/creative/presets";
 import { platformById } from "@/lib/creative/presets";
 import { aspectCss, cx, ratioOf } from "@/lib/utils";
+import { CREATIVE_STYLE_CONFIG, resolveCreativeStyle } from "@/lib/creative/style-config";
 import { BadgeCheck, Film, MapPin } from "lucide-react";
 import { ScoreRing } from "./ui";
+
+type CreativeFrameStyle = CSSProperties & Record<`--creative-${string}`, string | number>;
 
 export type AdAssetLike = {
   kind: string;
@@ -17,11 +20,9 @@ export type AdAssetLike = {
   approved?: boolean;
 };
 
-function getPaletteTones(hex?: string[]) {
-  const dark = hex?.[0] || "#0c100d";
-  const accent = hex?.[1] || "#d9ab5e";
-  const light = hex?.[2] || "#f4eee1";
-  return { dark, accent, light };
+function formatNumber(num: number): string {
+  const rounded = Number(num.toFixed(2));
+  return String(rounded);
 }
 
 function scaledFontSize(
@@ -35,7 +36,7 @@ function scaledFontSize(
   const scale = typeof percentage === "number" && Number.isFinite(percentage)
     ? Math.min(1.4, Math.max(0.75, percentage / 100))
     : 1;
-  return `clamp(${(minimum * scale).toFixed(1)}px, ${(preferred * scale).toFixed(2)}cqw, ${(maximum * scale).toFixed(1)}px)`;
+  return `clamp(${formatNumber(minimum * scale)}px, ${formatNumber(preferred * scale)}cqw, ${formatNumber(maximum * scale)}px)`;
 }
 
 /* ---------- brand lock-up ---------- */
@@ -43,18 +44,16 @@ function BrandRow({ brand }: { brand: BrandSettings }) {
   return null;
 }
 
-function CtaPill({ cta, wide, poster, accent = "#d9ab5e" }: { cta: string; wide?: boolean; poster?: boolean; accent?: string }) {
+function CtaPill({ cta, wide }: { cta: string; wide?: boolean }) {
   if (typeof cta !== "string" && typeof cta !== "number") return null;
   return (
     <span
-      className="inline-flex items-center font-sans font-semibold tracking-wide"
+      className="ad-cta-button inline-flex items-center font-sans font-semibold tracking-wide"
       style={{
         gap: "1cqw",
-        background: poster ? "linear-gradient(180deg,#fffef8,#edf2ee)" : `linear-gradient(180deg,#fffdf7,${accent})`,
-        color: poster ? "#131b14" : "#171208",
+        color: CREATIVE_STYLE_CONFIG.colors.ctaForeground,
         borderRadius: 999,
-        padding: poster ? "1.55cqw 3.1cqw" : wide ? "1cqw 2.4cqw" : "1.5cqw 3.4cqw",
-        boxShadow: poster ? "0 1cqw 3.2cqw rgba(0,0,0,.45), 0 0.2cqw 0.8cqw rgba(0,0,0,.25)" : "0 1cqw 3.2cqw rgba(0,0,0,.45), 0 0.3cqw 1cqw rgba(0,0,0,.35)",
+        padding: wide ? "1cqw 2.4cqw" : "1.5cqw 3.4cqw",
       }}
     >
       <span className={wide ? "adw-cta" : "ad-cta"}>{String(cta)}</span>
@@ -72,8 +71,8 @@ function PriceGhost({ price, wide }: { price: string; wide?: boolean }) {
         borderRadius: 999,
         padding: wide ? "0.9cqw 2cqw" : "1.3cqw 3cqw",
         backdropFilter: "blur(8px)",
-        background: "rgba(8,12,10,.48)",
-        boxShadow: "0 0.6cqw 2cqw rgba(0,0,0,.3)",
+        background: "rgba(8, 12, 10, 0.48)",
+        boxShadow: "0 0.6cqw 2cqw rgba(0, 0, 0, 0.3)",
       }}
     >
       <span className={wide ? "adw-price" : "ad-price"} style={{ fontSize: wide ? "2.2cqw" : "3.4cqw" }}>
@@ -126,6 +125,7 @@ function parseDeveloperAndProject(
 
 function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }) {
   const p = asset.payload;
+  const style = resolveCreativeStyle(p.hex, p.designStyle);
   const minimal = p.designStyle === "minimal";
   const bold = p.designStyle === "bold";
   const bullets = (p.bullets ?? []).slice(0, 3);
@@ -147,15 +147,20 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
   const contactText = p.cta?.toUpperCase() ?? "";
 
   return (
-    <div className="poster-copy-zone absolute inset-0 flex flex-col justify-between">
+    <div className="poster-copy-zone absolute inset-0 flex flex-col justify-between" suppressHydrationWarning>
       {/* Upper 40% Sky Typography Zone */}
-      <div className={cx("poster-copy-header pt-[3.8cqw] px-[4cqw]", minimal ? "text-left" : "text-center")} style={{ maxWidth: "96%", margin: "0 auto" }}>
+      <div
+        className={cx("poster-copy-header", minimal ? "text-left" : "text-center")}
+        style={{ maxWidth: "96%", margin: "0 auto", padding: style.layout.posterHeaderPadding }}
+      >
         {/* Developer / Brand Name */}
         <div
           className="font-sans font-bold tracking-[0.18em] text-white"
           style={{
             fontSize: scaledFontSize(p, "developer", 11, 3.2, 28),
-            textShadow: "0 2px 14px rgba(0,0,0,.95), 0 1px 3px rgba(0,0,0,1)",
+            color: style.colors.text,
+            fontFamily: style.typography.sans,
+            textShadow: style.effects.textShadow,
           }}
         >
           {developer}
@@ -168,8 +173,9 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
             fontSize: bold
               ? scaledFontSize(p, "headline", 22, 7.2, 72)
               : scaledFontSize(p, "headline", 20, 6.4, 64),
-            textShadow: "0 3px 20px rgba(0,0,0,.95), 0 1px 3px rgba(0,0,0,1)",
-            fontFamily: minimal ? "Inter, sans-serif" : undefined,
+            color: style.colors.text,
+            textShadow: style.effects.headlineShadow,
+            fontFamily: minimal ? style.typography.sans : undefined,
           }}
         >
           {project}
@@ -248,22 +254,29 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
       {/* Middle Zone remains completely OPEN and UNOBSTRUCTED for the architectural facade and pool */}
 
       {/* Bottom Contact Call Bar */}
-      {contactText &&       <div
-      className={cx("poster-cta-ribbon w-full text-center font-sans font-bold text-[#0c120e] mt-auto", minimal && "text-left", bold && "uppercase")}
-        style={{
-          background: "#ffffff",
-          padding: "1.8cqw 2cqw",
-        fontSize: bold
-          ? scaledFontSize(p, "cta", 12, 3, 28)
-          : scaledFontSize(p, "cta", 11, 2.7, 24),
-          letterSpacing: "0.06em",
-          boxShadow: "0 -2px 16px rgba(0,0,0,.35)",
-        borderTop: bold ? `0.55cqw solid ${p.hex?.[1] ?? "#d9ab5e"}` : undefined,
-        overflowWrap: "anywhere",
-      }}
-      >
-        {contactText}
-      </div>}
+      {contactText && (
+        <div
+          className={cx(
+            "poster-cta-ribbon w-full text-center font-sans font-bold text-[#0c120e] mt-auto",
+            minimal && "text-left",
+            bold && "uppercase"
+          )}
+          style={{
+            background: style.colors.ctaBackground,
+            color: style.colors.ctaForeground,
+            padding: "1.8cqw 2cqw",
+            fontSize: bold
+              ? scaledFontSize(p, "cta", 12, 3, 28)
+              : scaledFontSize(p, "cta", 11, 2.7, 24),
+            letterSpacing: "0.06em",
+            boxShadow: style.effects.ctaShadow,
+            borderTop: bold ? `0.55cqw solid ${style.colors.accent}` : undefined,
+            overflowWrap: "anywhere",
+          }}
+        >
+          {contactText}
+        </div>
+      )}
     </div>
   );
 }
@@ -275,7 +288,8 @@ function OverlayBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSetting
 /* ---------- wide (split) compositions ---------- */
 function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }) {
   const p = asset.payload;
-  const { dark, accent } = getPaletteTones(p.hex);
+  const style = resolveCreativeStyle(p.hex, p.designStyle);
+  const { dark, accent } = style.colors;
   const { developer, project } = parseDeveloperAndProject(p.kicker, p.headline, brand.name);
   const bhk = parseBhk(p.subline, p.kicker);
   const tagline = p.fine?.toUpperCase() ?? "";
@@ -289,13 +303,13 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
     : "";
 
   return (
-    <div className={cx("absolute inset-0 flex", p.designStyle === "minimal" && "text-left")}>
+    <div className={cx("absolute inset-0 flex", p.designStyle === "minimal" && "text-left")} suppressHydrationWarning>
       <div
         className="flex h-full flex-col justify-between"
         style={{
-          width: "44%",
-          padding: "2.4cqw 2.8cqw",
-          background: p.designStyle === "bold" ? `linear-gradient(160deg, ${accent}66, ${dark})` : `linear-gradient(160deg, ${dark}, #0b0907)`,
+          width: style.layout.widePanelWidth,
+          padding: style.layout.widePanelPadding,
+          backgroundImage: p.designStyle === "bold" ? `linear-gradient(160deg, ${accent}66, ${dark})` : `linear-gradient(160deg, ${dark}, ${style.colors.background})`,
           borderRight: `1px solid ${accent}3d`,
         }}
       >
@@ -363,29 +377,41 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
         </div>
 
         {/* Bottom Contact Call Bar */}
-        {contactText && <div
-          className="w-full text-center font-sans font-bold text-[#0c120e] mt-auto"
-          style={{
-            background: "#ffffff",
-            padding: "1.2cqw 1.6cqw",
-            fontSize: scaledFontSize(p, "cta", 9, 1.6, 16),
-            letterSpacing: "0.06em",
-            borderRadius: "4px",
-            boxShadow: "0 2px 12px rgba(0,0,0,.35)",
-            borderTop: p.designStyle === "bold" ? `0.55cqw solid ${accent}` : undefined,
-            overflowWrap: "anywhere",
-          }}
-        >
-          {contactText}
-        </div>}
+        {contactText && (
+          <div
+            className="w-full text-center font-sans font-bold text-[#0c120e] mt-auto"
+            style={{
+              background: style.colors.ctaBackground,
+              color: style.colors.ctaForeground,
+              padding: "1.2cqw 1.6cqw",
+              fontSize: scaledFontSize(p, "cta", 9, 1.6, 16),
+              letterSpacing: "0.06em",
+              borderRadius: `${style.layout.ctaRadius}px`,
+              boxShadow: "0 2px 12px rgba(0,0,0,.35)",
+              borderTop: p.designStyle === "bold" ? `0.55cqw solid ${accent}` : undefined,
+              overflowWrap: "anywhere",
+            }}
+          >
+            {contactText}
+          </div>
+        )}
       </div>
 
       <div className="relative h-full flex-1">
-        <img src={p.image} alt={asset.title ?? "ad visual"} loading="lazy" decoding="async" className="ad-img" />
+        {p.image && (
+          <img
+            src={p.image}
+            alt={asset.title ?? "ad visual"}
+            loading="lazy"
+            decoding="async"
+            className="ad-img"
+            style={{ filter: style.image.filter, transform: `scale(${style.image.scale})` }}
+          />
+        )}
         <div
           className="ad-wide-scrim"
           style={{
-            background: `linear-gradient(180deg, rgba(52, 146, 201, 0.65) 0%, rgba(52, 146, 201, 0) 48%), linear-gradient(90deg, ${dark}cc, transparent 35%)`
+            backgroundImage: `linear-gradient(180deg, ${style.canvasExport.topScrimColor} 0%, ${style.canvasExport.topScrimFade} 48%), linear-gradient(90deg, ${dark}cc, transparent 35%)`
           }}
         />
       </div>
@@ -408,22 +434,45 @@ export function AdCreative({
   className?: string;
 }) {
   const wide = asset.payload.layout ? asset.payload.layout === "wide" : ["linkedin", "portal"].includes(asset.platform);
-  const { dark, accent } = getPaletteTones(asset.payload.hex);
+  const style = resolveCreativeStyle(asset.payload.hex, asset.payload.designStyle);
+  const { dark, accent } = style.colors;
+  const frameStyle: CreativeFrameStyle = {
+    aspectRatio: aspectCss(asset.aspect),
+    borderRadius: "inherit",
+    background: style.colors.background,
+    "--creative-background": style.colors.background,
+    "--creative-font-sans": style.typography.sans,
+    "--creative-font-display": style.typography.display,
+    "--creative-accent": style.colors.accent,
+    "--creative-text": style.colors.text,
+    "--creative-image-filter": style.image.filter,
+    "--creative-image-scale": style.image.scale,
+  };
 
   return (
     <div
       className={cx("adframe select-none", className)}
       data-design-style={asset.payload.designStyle ?? "editorial"}
-      style={{ aspectRatio: aspectCss(asset.aspect), borderRadius: "inherit" }}
+      style={frameStyle}
+      suppressHydrationWarning
     >
       {!wide && (
         <>
-          <img src={asset.payload.image} alt={asset.title ?? "ad visual"} loading="lazy" decoding="async" className="ad-img" />
+          {asset.payload.image && (
+            <img
+              src={asset.payload.image}
+              alt={asset.title ?? "ad visual"}
+              loading="lazy"
+              decoding="async"
+              className="ad-img"
+              style={{ filter: style.image.filter, transform: `scale(${style.image.scale})` }}
+            />
+          )}
           {/* Dynamic project-adaptive scrim for 100% typography contrast and open focal subject visibility */}
           <div
             className="ad-scrim"
             style={{
-              background: "linear-gradient(180deg, rgba(52, 146, 201, 0.65) 0%, rgba(52, 146, 201, 0) 48%)"
+              backgroundImage: `linear-gradient(180deg, ${style.canvasExport.topScrimColor} 0%, ${style.canvasExport.topScrimFade} 48%)`,
             }}
           />
           {/* Subtle color grading layer tying visual into project Creative DNA */}
@@ -431,7 +480,7 @@ export function AdCreative({
             style={{
               position: "absolute",
               inset: 0,
-              background: `linear-gradient(135deg, ${accent}0d, ${dark}18)`,
+              backgroundImage: `linear-gradient(135deg, ${accent}0d, ${dark}18)`,
               mixBlendMode: "soft-light",
               pointerEvents: "none",
             }}
