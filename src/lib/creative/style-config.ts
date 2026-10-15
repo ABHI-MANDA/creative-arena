@@ -1,5 +1,27 @@
 export type CreativeDesignStyle = "editorial" | "minimal" | "bold";
 
+export type ScrimSettings = {
+  opacity: number;
+  color: string;
+  height: number;
+};
+
+export const DEFAULT_SCRIM_SETTINGS: ScrimSettings = {
+  opacity: 65,
+  color: "#0c1012",
+  height: 48,
+};
+
+export const SCRIM_PRESETS: {
+  label: string;
+  settings: ScrimSettings;
+}[] = [
+  { label: "Dark Ambient", settings: { opacity: 65, color: "#0c1012", height: 48 } },
+  { label: "Soft Shadow", settings: { opacity: 30, color: "#000000", height: 35 } },
+  { label: "Deep Vignette", settings: { opacity: 80, color: "#000000", height: 85 } },
+  { label: "No Scrim", settings: { opacity: 0, color: "#000000", height: 48 } },
+];
+
 export const CREATIVE_DESIGN_STYLES: {
   value: CreativeDesignStyle;
   label: string;
@@ -46,6 +68,15 @@ export const CREATIVE_STYLE_CONFIG = {
     ctaShadow: "0 -2px 16px rgba(0,0,0,.35)",
   },
 } as const;
+
+export function contrastingTextBackground(color: string): string {
+  const hex = /^#[\da-f]{6}$/i.test(color) ? color.slice(1) : "171208";
+  const channels = [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+  const luminance = channels
+    .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  return luminance > 0.5 ? CREATIVE_STYLE_CONFIG.colors.dark : CREATIVE_STYLE_CONFIG.colors.ctaBackground;
+}
 
 export type CreativeStyle = {
   design: CreativeDesignStyle;

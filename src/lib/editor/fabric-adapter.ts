@@ -3,9 +3,14 @@ import * as fabric from "fabric";
 // Register custom metadata property for Fabric v7 serialization
 (fabric.FabricObject as unknown as { customProperties?: string[] }).customProperties = ["meta"];
 
-import type { AssetPayload } from "@/lib/creative/engine";
+import type { AdTextSection, AssetPayload } from "@/lib/creative/engine";
 import type { BrandSettings } from "@/lib/creative/presets";
-import { CREATIVE_STYLE_CONFIG, resolveCreativeStyle } from "@/lib/creative/style-config";
+import {
+  DEFAULT_SCRIM_SETTINGS,
+  contrastingTextBackground,
+  resolveCreativeStyle,
+  type ScrimSettings,
+} from "@/lib/creative/style-config";
 
 export type FontOption = {
   name: string;
@@ -42,14 +47,14 @@ export function syncGeneratedImageGradient(
   layout: "poster" | "wide",
   width: number,
   height: number,
-  topScrimColor = CREATIVE_STYLE_CONFIG.canvasExport.topScrimColor,
-  topScrimFade = CREATIVE_STYLE_CONFIG.canvasExport.topScrimFade
+  settings: ScrimSettings = DEFAULT_SCRIM_SETTINGS
 ) {
-  const left = layout === "wide"
-    ? Math.round(width * (parseFloat(CREATIVE_STYLE_CONFIG.layout.widePanelWidth) / 100))
-    : 0;
-  const gradientWidth = width - left;
-  const gradientHeight = height * 0.48;
+  const gradientHeight = height * (Math.min(90, Math.max(10, settings.height)) / 100);
+  const opacity = Math.min(100, Math.max(0, settings.opacity)) / 100;
+  const color = /^#[\da-f]{6}$/i.test(settings.color) ? settings.color : DEFAULT_SCRIM_SETTINGS.color;
+  const red = Number.parseInt(color.slice(1, 3), 16);
+  const green = Number.parseInt(color.slice(3, 5), 16);
+  const blue = Number.parseInt(color.slice(5, 7), 16);
   const gradientIds = new Set(["scrim-poster", "scrim-wide"]);
 
   for (const object of canvas.getObjects().filter((item) => {
@@ -58,22 +63,17 @@ export function syncGeneratedImageGradient(
   })) {
     canvas.remove(object);
   }
-  for (const object of canvas.getObjects()) {
-    const meta = (object as unknown as { meta?: ObjectMeta }).meta;
-    if (meta?.id === "cta-bg") object.set("fill", CREATIVE_STYLE_CONFIG.colors.ctaBackground);
-  }
-
   const scrim = new fabric.Rect({
-    left,
+    left: 0,
     top: 0,
-    width: gradientWidth,
+    width,
     height: gradientHeight,
     fill: new fabric.Gradient({
       type: "linear",
       coords: { x1: 0, y1: 0, x2: 0, y2: gradientHeight },
       colorStops: [
-        { offset: 0, color: topScrimColor },
-        { offset: 1, color: topScrimFade },
+        { offset: 0, color: `rgba(${red}, ${green}, ${blue}, ${opacity})` },
+        { offset: 1, color: `rgba(${red}, ${green}, ${blue}, 0)` },
       ],
     }),
     selectable: false,
@@ -81,7 +81,7 @@ export function syncGeneratedImageGradient(
   });
   (scrim as unknown as { meta: ObjectMeta }).meta = {
     id: layout === "wide" ? "scrim-wide" : "scrim-poster",
-    name: "Top ambient contrast scrim",
+    name: "Image scrim",
     editable: false,
     locked: true,
     deletable: false,
@@ -89,8 +89,23 @@ export function syncGeneratedImageGradient(
     category: "shape",
     aiGenerated: true,
   };
-
   canvas.insertAt(Math.min(1, canvas.getObjects().length), scrim);
+}
+
+function fontScale(payload: AssetPayload, section: AdTextSection): number {
+  const value = payload.fontSizes?.[section];
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(1.4, Math.max(0.75, value / 100))
+    : 1;
+}
+
+function scaledFontSize(payload: AssetPayload, section: AdTextSection, base: number): number {
+  return Math.round(base * fontScale(payload, section));
+}
+
+function fontColor(payload: AssetPayload, section: AdTextSection, fallback: string): string {
+  const value = payload.fontColors?.[section];
+  return typeof value === "string" && /^#[\da-f]{6}$/i.test(value) ? value : fallback;
 }
 
 export function getCanvasDimensions(aspect: string): { width: number; height: number } {
@@ -176,8 +191,7 @@ export function populateEditableOverlays(
       "poster",
       W,
       H,
-      style.canvasExport.topScrimColor,
-      style.canvasExport.topScrimFade
+      payload.scrimSettings ?? DEFAULT_SCRIM_SETTINGS
     );
     populatePosterObjects(canvas, payload, brand, W, H);
     return;
@@ -192,70 +206,69 @@ export function populateEditableOverlays(
       "wide",
       W,
       H,
-      style.canvasExport.topScrimColor,
-      style.canvasExport.topScrimFade
+      payload.scrimSettings ?? DEFAULT_SCRIM_SETTINGS
     );
     const lm = 2.6 * cqw;
     const innerW = panelW - 2 * lm;
     let topY = 1.4 * cqw;
 
     if (payload.kicker) {
-      const fs = 1.5 * cqw;
+      const fs = scaledFontSize(payload, "developer", 1.5 * cqw);
       addText(payload.kicker.toUpperCase(), {
         metaId: "text-kicker", metaName: "Kicker",
         left: lm, top: topY, width: innerW,
         fontSize: fs, fontFamily: "monospace", fontWeight: "bold",
-        fill: style.colors.accent, charSpacing: 320,
+        fill: fontColor(payload, "developer", style.colors.accent), charSpacing: 320,
       });
       topY += calcTextHeight(payload.kicker, fs, innerW) + 1 * cqw;
     }
     if (payload.headline) {
-      const fs = 4.7 * cqw;
+      const fs = scaledFontSize(payload, "headline", 4.7 * cqw);
       addText(payload.headline, {
         metaId: "text-headline", metaName: "Headline",
         left: lm, top: topY, width: innerW,
         fontSize: fs, fontFamily: "'Playfair Display', serif",
-        fill: style.colors.text, lineHeight: 1.06,
+        fill: fontColor(payload, "headline", style.colors.text), lineHeight: 1.06,
       });
       topY += calcTextHeight(payload.headline, fs, innerW) + 1 * cqw;
     }
     if (payload.subline) {
-      const fs = 2.05 * cqw;
+      const fs = scaledFontSize(payload, "location", 2.05 * cqw);
       addText(payload.subline, {
         metaId: "text-subline", metaName: "Subline",
         left: lm, top: topY, width: innerW,
         fontSize: fs, fontFamily: "Inter, sans-serif",
-        fill: style.colors.mutedText,
+        fill: fontColor(payload, "location", style.colors.mutedText),
       });
       topY += calcTextHeight(payload.subline, fs, innerW) + 1 * cqw;
     }
     (payload.bullets ?? []).slice(0, 3).forEach((b, i) => {
-      const fs = 1.75 * cqw;
+      const fs = scaledFontSize(payload, "amenities", 1.75 * cqw);
       addText(`•  ${b}`, {
         metaId: `text-bullet-${i}`, metaName: `Bullet ${i + 1}`,
         left: lm, top: topY, width: innerW,
         fontSize: fs, fontFamily: "Inter, sans-serif",
-        fill: style.colors.mutedText,
+        fill: fontColor(payload, "amenities", style.colors.mutedText),
       });
       topY += calcTextHeight(`•  ${b}`, fs, innerW) + 0.7 * cqw;
     });
     if (payload.priceLine) {
-      const fs = 3.1 * cqw;
+      const fs = scaledFontSize(payload, "price", 3.1 * cqw);
       addText(payload.priceLine, {
         metaId: "text-price", metaName: "Price",
         left: lm, top: H - 5 * cqw, width: innerW * 0.7,
         fontSize: fs, fontFamily: "'Playfair Display', serif",
-        fill: style.colors.light,
+        fill: fontColor(payload, "price", style.colors.light),
       });
     }
     if (payload.cta) {
-      const fs = 1.7 * cqw;
+      const fs = scaledFontSize(payload, "cta", 1.7 * cqw);
       const ctaW = Math.min(panelW * 0.7, payload.cta.length * fs * 0.65 + 4 * cqw);
       const ctaBg = new fabric.Rect({
         left: lm, top: H - 3.5 * cqw - fs - 2 * cqw,
         width: ctaW, height: fs + 2.2 * cqw,
         rx: (fs + 2.2 * cqw) / 2, ry: (fs + 2.2 * cqw) / 2,
-        fill: style.colors.ctaBackground, backgroundColor: "transparent",
+        fill: contrastingTextBackground(fontColor(payload, "cta", style.colors.ctaForeground)), backgroundColor: "transparent",
       });
       (ctaBg as unknown as { meta: ObjectMeta }).meta = meta("cta-bg", "CTA Button", "shape");
       canvas.add(ctaBg);
@@ -264,7 +277,7 @@ export function populateEditableOverlays(
         left: lm + ctaW / 2, top: H - 3.5 * cqw - fs - 2 * cqw + 1.1 * cqw,
         originX: "center", width: ctaW, textAlign: "center",
         fontSize: fs, fontFamily: "Inter, sans-serif",
-        fontWeight: "bold", fill: style.colors.ctaForeground,
+        fontWeight: "bold", fill: fontColor(payload, "cta", style.colors.ctaForeground),
       });
     }
     return;
@@ -279,13 +292,13 @@ export function populateEditableOverlays(
 
   // Kicker
   if (payload.kicker) {
-    const fs = kind === "offer" ? 2 * cqw : 2.15 * cqw;
+    const fs = scaledFontSize(payload, "developer", kind === "offer" ? 2 * cqw : 2.15 * cqw);
     addText(kind === "offer" ? payload.kicker : payload.kicker.toUpperCase(), {
       metaId: "text-kicker", metaName: "Kicker",
       left: pad, top: topY, width: innerW,
       fontSize: fs, fontFamily: kind === "offer" ? "monospace" : "monospace",
       fontWeight: "bold",
-      fill: kind === "offer" ? "#171208" : "#d9ab5e",
+      fill: fontColor(payload, "developer", kind === "offer" ? "#171208" : "#d9ab5e"),
       charSpacing: kind === "offer" ? 240 : 340,
     });
     topY += calcTextHeight(payload.kicker, fs, innerW) + 1.6 * cqw;
@@ -294,14 +307,14 @@ export function populateEditableOverlays(
   // Headline / Hook
   const headText = payload.headline || payload.hook;
   if (headText) {
-    const fs = kind === "offer" ? 6.4 * cqw : 8.6 * cqw;
+    const fs = scaledFontSize(payload, "headline", kind === "offer" ? 6.4 * cqw : 8.6 * cqw);
     addText(headText, {
       metaId: "text-headline", metaName: "Headline",
       left: pad, top: topY, width: innerW,
       fontSize: fs,
       fontFamily: (kind === "lifestyle" || kind === "reel") ? "'Playfair Display', serif" : "'Playfair Display', serif",
       fontWeight: "normal",
-      fill: "#fffdf5",
+      fill: fontColor(payload, "headline", "#fffdf5"),
       lineHeight: 1.04,
     });
     topY += calcTextHeight(headText, fs, innerW) + 1.6 * cqw;
@@ -309,12 +322,12 @@ export function populateEditableOverlays(
 
   // Subline
   if (payload.subline && (kind === "hero" || kind === "story" || kind === "lifestyle")) {
-    const fs = 3.1 * cqw;
+    const fs = scaledFontSize(payload, "location", 3.1 * cqw);
     addText(payload.subline, {
       metaId: "text-subline", metaName: "Subline",
       left: pad, top: topY, width: innerW * 0.8,
       fontSize: fs, fontFamily: "Inter, sans-serif",
-      fill: "rgba(244,238,225,0.86)",
+      fill: fontColor(payload, "location", "rgba(244,238,225,0.86)"),
     });
     topY += calcTextHeight(payload.subline, fs, innerW * 0.8) + 1.4 * cqw;
   }
@@ -340,8 +353,8 @@ export function populateEditableOverlays(
       addText(`●  ${b}`, {
         metaId: `text-chip-${idx}`, metaName: `Feature ${idx + 1}`,
         left: cLeft + 1.2 * cqw, top: cTop + 1.3 * cqw,
-        width: chipW - 1.8 * cqw, fontSize: 2.5 * cqw,
-        fontFamily: "Inter, sans-serif", fill: "#fffdf5",
+        width: chipW - 1.8 * cqw, fontSize: scaledFontSize(payload, "amenities", 2.5 * cqw),
+        fontFamily: "Inter, sans-serif", fill: fontColor(payload, "amenities", "#fffdf5"),
       });
     });
   }
@@ -349,14 +362,14 @@ export function populateEditableOverlays(
   // Location rows
   if (kind === "location") {
     (payload.rows ?? []).slice(0, 4).forEach((r, i) => {
-      const fs = 2.9 * cqw;
+      const fs = scaledFontSize(payload, "location", 2.9 * cqw);
       addText(
         `${r.label}${r.mins !== undefined ? `   ${r.mins} MIN` : ""}`,
         {
           metaId: `text-row-${i}`, metaName: `Location Row ${i + 1}`,
           left: pad, top: topY, width: innerW,
           fontSize: fs, fontFamily: "Inter, sans-serif",
-          fill: "rgba(244,238,225,0.92)",
+          fill: fontColor(payload, "location", "rgba(244,238,225,0.92)"),
         }
       );
       topY += fs * 1.15 + 2.3 * cqw;
@@ -365,12 +378,12 @@ export function populateEditableOverlays(
 
   // Offer price
   if (kind === "offer" && payload.priceLine) {
-    const fs = 5.4 * cqw;
+    const fs = scaledFontSize(payload, "price", 5.4 * cqw);
     addText(payload.priceLine, {
       metaId: "text-price", metaName: "Price",
       left: pad, top: topY, width: innerW,
       fontSize: fs, fontFamily: "'Playfair Display', serif",
-      fontWeight: "500", fill: "#ecd9ac",
+      fontWeight: "500", fill: fontColor(payload, "price", "#ecd9ac"),
     });
     topY += fs * 1.2 + 1.6 * cqw;
   }
@@ -379,7 +392,7 @@ export function populateEditableOverlays(
   let btmY = H - pad - 1.6 * cqw;
 
   if (payload.cta && kind !== "reel") {
-    const fs = 2.6 * cqw;
+    const fs = scaledFontSize(payload, "cta", 2.6 * cqw);
     const ctaH = fs + 3 * cqw;
     const ctaW = payload.cta.length * fs * 0.64 + 6.8 * cqw;
 
@@ -387,7 +400,7 @@ export function populateEditableOverlays(
       left: pad, top: btmY - ctaH + fs * 0.5,
       width: ctaW, height: ctaH,
       rx: 0, ry: 0,
-      fill: "#ffffff",
+      fill: contrastingTextBackground(fontColor(payload, "cta", "#171208")),
       backgroundColor: "transparent",
     });
     (ctaBg as unknown as { meta: ObjectMeta }).meta = meta("cta-bg", "CTA Button", "shape");
@@ -397,7 +410,7 @@ export function populateEditableOverlays(
       left: pad + ctaW / 2, top: btmY - ctaH + fs * 0.5 + ctaH / 2 - fs / 2,
       originX: "center", width: ctaW, textAlign: "center",
       fontSize: fs, fontFamily: "Inter, sans-serif",
-      fontWeight: "bold", fill: "#171208",
+      fontWeight: "bold", fill: fontColor(payload, "cta", "#171208"),
     });
 
     if ((kind === "hero" || kind === "story") && payload.priceLine) {
@@ -407,19 +420,19 @@ export function populateEditableOverlays(
         top: btmY - ctaH + fs * 0.5 + ctaH / 2 - fs / 2,
         width: innerW - ctaW - 1.8 * cqw,
         fontSize: fs, fontFamily: "'Playfair Display', serif",
-        fill: "#ecd9ac",
+        fill: fontColor(payload, "price", "#ecd9ac"),
       });
     }
     btmY -= ctaH + 0.6 * cqw;
   }
 
   if (payload.locationLabel) {
-    const fs = 2 * cqw;
+    const fs = scaledFontSize(payload, "location", 2 * cqw);
     addText(`📍  ${payload.locationLabel}`, {
       metaId: "text-location", metaName: "Location",
       left: pad, top: btmY - fs * 1.4, width: innerW,
       fontSize: fs, fontFamily: "Inter, sans-serif",
-      fill: "rgba(244,238,225,0.92)",
+      fill: fontColor(payload, "location", "rgba(244,238,225,0.92)"),
     });
   }
 }
@@ -489,7 +502,7 @@ function populatePosterObjects(
   let currentTop = Math.max(28, 3.8 * cqw);
 
   // 2. Developer / Brand Name
-  const devFs = Math.max(12, Math.round(3.2 * cqw));
+  const devFs = scaledFontSize(payload, "developer", Math.max(12, Math.round(3.2 * cqw)));
   const devText = new fabric.Textbox(developer, {
     left: width / 2,
     top: currentTop,
@@ -499,7 +512,7 @@ function populatePosterObjects(
     fontSize: devFs,
     fontFamily: style.typography.sans,
     fontWeight: "bold",
-    fill: style.colors.text,
+    fill: fontColor(payload, "developer", style.colors.text),
     charSpacing: 180,
   });
   (devText as unknown as { meta: ObjectMeta }).meta = {
@@ -516,7 +529,7 @@ function populatePosterObjects(
   currentTop += devFs * 1.2 + 0.8 * cqw;
 
   // 3. Project Name
-  const projFs = Math.max(22, Math.round(6.4 * cqw));
+  const projFs = scaledFontSize(payload, "headline", Math.max(22, Math.round(6.4 * cqw)));
   const projText = new fabric.Textbox(project, {
     left: width / 2,
     top: currentTop,
@@ -526,7 +539,7 @@ function populatePosterObjects(
     fontSize: projFs,
     fontFamily: style.typography.sans,
     fontWeight: "800",
-    fill: style.colors.text,
+    fill: fontColor(payload, "headline", style.colors.text),
     charSpacing: 60,
     lineHeight: 1.02,
   });
@@ -544,7 +557,7 @@ function populatePosterObjects(
   currentTop += calcTextHeight(project, projFs, width * 0.92) + 1.2 * cqw;
 
   // 4. Tagline & Divider
-  const tagFs = Math.max(10, Math.round(2.3 * cqw));
+  const tagFs = scaledFontSize(payload, "tagline", Math.max(10, Math.round(2.3 * cqw)));
   const tagText = new fabric.Textbox(tagline, {
     left: width / 2,
     top: currentTop,
@@ -554,7 +567,7 @@ function populatePosterObjects(
     fontSize: tagFs,
     fontFamily: style.typography.sans,
     fontWeight: "600",
-    fill: style.colors.mutedText,
+    fill: fontColor(payload, "tagline", style.colors.mutedText),
     charSpacing: 160,
   });
   (tagText as unknown as { meta: ObjectMeta }).meta = {
@@ -594,7 +607,7 @@ function populatePosterObjects(
   currentTop += 1.6 * cqw;
 
   // 5. BHK Highlight
-  const bhkFs = Math.max(26, Math.round(7.6 * cqw));
+  const bhkFs = scaledFontSize(payload, "bhk", Math.max(26, Math.round(7.6 * cqw)));
   const bhkText = new fabric.Textbox(bhk, {
     left: width / 2,
     top: currentTop,
@@ -604,7 +617,7 @@ function populatePosterObjects(
     fontSize: bhkFs,
     fontFamily: style.typography.sans,
     fontWeight: "900",
-    fill: style.colors.text,
+    fill: fontColor(payload, "bhk", style.colors.text),
     lineHeight: 1.0,
   });
   (bhkText as unknown as { meta: ObjectMeta }).meta = {
@@ -621,7 +634,7 @@ function populatePosterObjects(
   currentTop += bhkFs * 1.05 + 1.1 * cqw;
 
   // 6. Typology & Location Subtitle
-  const locFs = Math.max(9, Math.round(2.2 * cqw));
+  const locFs = scaledFontSize(payload, "location", Math.max(9, Math.round(2.2 * cqw)));
   const locText = new fabric.Textbox(locationTag, {
     left: width / 2,
     top: currentTop,
@@ -631,7 +644,7 @@ function populatePosterObjects(
     fontSize: locFs,
     fontFamily: style.typography.sans,
     fontWeight: "600",
-    fill: style.colors.mutedText,
+    fill: fontColor(payload, "location", style.colors.mutedText),
     charSpacing: 220,
   });
   (locText as unknown as { meta: ObjectMeta }).meta = {
@@ -648,7 +661,7 @@ function populatePosterObjects(
   currentTop += locFs * 1.2 + 1.1 * cqw;
 
   // 7. Key Amenities / Open Spaces Line
-  const amenFs = Math.max(9, Math.round(1.95 * cqw));
+  const amenFs = scaledFontSize(payload, "amenities", Math.max(9, Math.round(1.95 * cqw)));
   const amenText = new fabric.Textbox(amenitiesLine, {
     left: width / 2,
     top: currentTop,
@@ -658,7 +671,7 @@ function populatePosterObjects(
     fontSize: amenFs,
     fontFamily: style.typography.sans,
     fontWeight: "500",
-    fill: style.colors.mutedText,
+    fill: fontColor(payload, "amenities", style.colors.mutedText),
     charSpacing: 120,
   });
   (amenText as unknown as { meta: ObjectMeta }).meta = {
@@ -675,7 +688,7 @@ function populatePosterObjects(
   currentTop += amenFs * 1.2 + 1.8 * cqw;
 
   // 8. Starting Price Block
-  const priceLabelFs = Math.max(8, Math.round(1.8 * cqw));
+  const priceLabelFs = scaledFontSize(payload, "price", Math.max(8, Math.round(1.8 * cqw)));
   const startLabel = new fabric.Textbox(price ? "——  STARTING FROM  ——" : "", {
     left: width / 2,
     top: currentTop,
@@ -685,7 +698,7 @@ function populatePosterObjects(
     fontSize: priceLabelFs,
     fontFamily: style.typography.sans,
     fontWeight: "600",
-    fill: style.colors.mutedText,
+    fill: fontColor(payload, "price", style.colors.mutedText),
     charSpacing: 200,
   });
   (startLabel as unknown as { meta: ObjectMeta }).meta = {
@@ -701,7 +714,7 @@ function populatePosterObjects(
   canvas.add(startLabel);
   currentTop += priceLabelFs * 1.2 + 0.5 * cqw;
 
-  const priceFs = Math.max(20, Math.round(5.6 * cqw));
+  const priceFs = scaledFontSize(payload, "price", Math.max(20, Math.round(5.6 * cqw)));
   const priceText = new fabric.Textbox(price, {
     left: width / 2,
     top: currentTop,
@@ -711,7 +724,7 @@ function populatePosterObjects(
     fontSize: priceFs,
     fontFamily: style.typography.sans,
     fontWeight: "900",
-    fill: style.colors.text,
+    fill: fontColor(payload, "price", style.colors.text),
     lineHeight: 1.0,
   });
   (priceText as unknown as { meta: ObjectMeta }).meta = {
@@ -735,7 +748,7 @@ function populatePosterObjects(
     top: callBarTop,
     width,
     height: callBarH,
-    fill: style.colors.ctaBackground,
+    fill: contrastingTextBackground(fontColor(payload, "cta", style.colors.ctaForeground)),
     selectable: false,
   });
   (callBarBg as unknown as { meta: ObjectMeta }).meta = {
@@ -750,7 +763,7 @@ function populatePosterObjects(
   };
   canvas.add(callBarBg);
 
-  const callFs = Math.max(12, Math.round(2.7 * cqw));
+  const callFs = scaledFontSize(payload, "cta", Math.max(12, Math.round(2.7 * cqw)));
   const callTextObj = new fabric.Textbox(contactText, {
     left: width / 2,
     top: callBarTop + (callBarH - callFs) / 2,
@@ -760,7 +773,7 @@ function populatePosterObjects(
     fontSize: callFs,
     fontFamily: style.typography.sans,
     fontWeight: "bold",
-    fill: style.colors.ctaForeground,
+    fill: fontColor(payload, "cta", style.colors.ctaForeground),
     charSpacing: 60,
   });
   (callTextObj as unknown as { meta: ObjectMeta }).meta = {
@@ -790,6 +803,14 @@ export function populateDefaultFabricObjects(
   const isWide = payload.layout
     ? payload.layout === "wide"
     : ["linkedin", "portal"].includes(platform) || aspect === "16:9";
+
+  syncGeneratedImageGradient(
+    canvas,
+    isWide ? "wide" : "poster",
+    width,
+    height,
+    payload.scrimSettings ?? DEFAULT_SCRIM_SETTINGS
+  );
 
   if (isWide) {
     const panelWidth = Math.round(width * (parseFloat(style.layout.widePanelWidth) / 100));
@@ -824,14 +845,15 @@ export function populateDefaultFabricObjects(
 
     // 2. Kicker
     if (payload.kicker) {
+      const kickerFontSize = scaledFontSize(payload, "developer", 20);
       const kicker = new fabric.Textbox(payload.kicker.toUpperCase(), {
         left: leftMargin,
         top: currentTop,
         width: contentWidth,
-        fontSize: 20,
+        fontSize: kickerFontSize,
         fontFamily: "Inter, sans-serif",
         fontWeight: "bold",
-        fill: style.colors.text,
+        fill: fontColor(payload, "developer", style.colors.text),
         charSpacing: 160,
       });
       (kicker as unknown as { meta: ObjectMeta }).meta = {
@@ -845,19 +867,20 @@ export function populateDefaultFabricObjects(
         aiGenerated: true,
       };
       canvas.add(kicker);
-      currentTop += calcTextHeight(payload.kicker, 20, contentWidth) + 12;
+      currentTop += calcTextHeight(payload.kicker, kickerFontSize, contentWidth) + 12;
     }
 
     // 3. Headline
     if (payload.headline) {
+      const headlineFontSize = scaledFontSize(payload, "headline", 42);
       const headline = new fabric.Textbox(payload.headline, {
         left: leftMargin,
         top: currentTop,
         width: contentWidth,
-        fontSize: 42,
+        fontSize: headlineFontSize,
         fontFamily: style.typography.display,
         fontWeight: "normal",
-        fill: style.colors.text,
+        fill: fontColor(payload, "headline", style.colors.text),
         lineHeight: 1.15,
       });
       (headline as unknown as { meta: ObjectMeta }).meta = {
@@ -871,19 +894,20 @@ export function populateDefaultFabricObjects(
         aiGenerated: true,
       };
       canvas.add(headline);
-      currentTop += calcTextHeight(payload.headline, 42, contentWidth) + 15;
+      currentTop += calcTextHeight(payload.headline, headlineFontSize, contentWidth) + 15;
     }
 
     // 4. Subline
     if (payload.subline) {
+      const sublineFontSize = scaledFontSize(payload, "location", 22);
       const subline = new fabric.Textbox(payload.subline, {
         left: leftMargin,
         top: currentTop,
         width: contentWidth,
-        fontSize: 22,
+        fontSize: sublineFontSize,
         fontFamily: "Inter, sans-serif",
         fontWeight: "normal",
-        fill: style.colors.mutedText,
+        fill: fontColor(payload, "location", style.colors.mutedText),
       });
       (subline as unknown as { meta: ObjectMeta }).meta = {
         id: "text-subline",
@@ -896,21 +920,22 @@ export function populateDefaultFabricObjects(
         aiGenerated: true,
       };
       canvas.add(subline);
-      currentTop += calcTextHeight(payload.subline, 22, contentWidth) + 15;
+      currentTop += calcTextHeight(payload.subline, sublineFontSize, contentWidth) + 15;
     }
 
     // 5. Bullets
     const bullets = (payload.bullets ?? []).slice(0, 3);
     if (bullets.length > 0) {
       bullets.forEach((b, idx) => {
+        const bulletFontSize = scaledFontSize(payload, "amenities", 18);
         const bText = new fabric.Textbox(`•  ${b}`, {
           left: leftMargin,
           top: currentTop,
           width: contentWidth,
-          fontSize: 18,
+          fontSize: bulletFontSize,
           fontFamily: "Inter, sans-serif",
           fontWeight: "bold",
-          fill: style.colors.mutedText,
+          fill: fontColor(payload, "amenities", style.colors.mutedText),
         });
         (bText as unknown as { meta: ObjectMeta }).meta = {
           id: `text-bullet-${idx}`,
@@ -923,7 +948,7 @@ export function populateDefaultFabricObjects(
           aiGenerated: true,
         };
         canvas.add(bText);
-        currentTop += calcTextHeight(`•  ${b}`, 18, contentWidth) + 8;
+        currentTop += calcTextHeight(`•  ${b}`, bulletFontSize, contentWidth) + 8;
       });
     }
 
@@ -935,9 +960,9 @@ export function populateDefaultFabricObjects(
           left: leftMargin,
           top: currentTop,
           width: contentWidth,
-          fontSize: 18,
+          fontSize: scaledFontSize(payload, "location", 18),
           fontFamily: "Inter, sans-serif",
-          fill: style.colors.mutedText,
+          fill: fontColor(payload, "location", style.colors.mutedText),
         });
         (rText as unknown as { meta: ObjectMeta }).meta = {
           id: `text-row-${idx}`,
@@ -963,7 +988,7 @@ export function populateDefaultFabricObjects(
         height: 52,
         rx: 26,
         ry: 26,
-        fill: style.colors.ctaBackground,
+        fill: contrastingTextBackground(fontColor(payload, "cta", style.colors.ctaForeground)),
       });
       (ctaBg as unknown as { meta: ObjectMeta }).meta = {
         id: "cta-bg",
@@ -983,10 +1008,10 @@ export function populateDefaultFabricObjects(
         originX: "center",
         width: 220,
         textAlign: "center",
-        fontSize: 18,
+        fontSize: scaledFontSize(payload, "cta", 18),
         fontFamily: "Inter, sans-serif",
         fontWeight: "bold",
-        fill: style.colors.ctaForeground,
+        fill: fontColor(payload, "cta", style.colors.ctaForeground),
       });
       (ctaText as unknown as { meta: ObjectMeta }).meta = {
         id: "text-cta",
@@ -1007,10 +1032,10 @@ export function populateDefaultFabricObjects(
         left: leftMargin + 260,
         top: height - 112,
         width: contentWidth - 260,
-        fontSize: 28,
+        fontSize: scaledFontSize(payload, "price", 28),
         fontFamily: style.typography.display,
         fontWeight: "bold",
-        fill: style.colors.light,
+        fill: fontColor(payload, "price", style.colors.light),
       });
       (price as unknown as { meta: ObjectMeta }).meta = {
         id: "text-price",

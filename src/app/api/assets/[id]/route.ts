@@ -139,6 +139,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           direction,
           images: bundle.images.map((i) => ({ url: i.url, label: i.label })),
           thresholds: brand.thresholds,
+          typographyDefaults: brand.typographyDefaults,
           variant,
         },
         variant

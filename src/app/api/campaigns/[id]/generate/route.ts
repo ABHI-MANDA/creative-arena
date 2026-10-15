@@ -128,6 +128,7 @@ async function tryAIImagePipeline({
         thresholds,
         override,
         approvedContent,
+        typographyDefaults: brand.typographyDefaults,
         enabledKinds,
         variant: 10,
       });
@@ -167,6 +168,7 @@ async function tryAIImagePipeline({
           thresholds,
           override,
           approvedContent,
+          typographyDefaults: brand.typographyDefaults,
           enabledKinds,
         }).filter((asset) => asset.kind !== "copy").map((asset) => ({
           ...asset,
@@ -192,6 +194,7 @@ async function tryAIImagePipeline({
       thresholds,
       override,
       approvedContent,
+      typographyDefaults: brand.typographyDefaults,
       enabledKinds,
     }).find((asset) => asset.kind === "copy");
     if (copyPack) assetsByPlatform.push(copyPack);
@@ -328,6 +331,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         thresholds: brand.thresholds,
         override,
         approvedContent,
+        typographyDefaults: brand.typographyDefaults,
         enabledKinds,
       });
       // Tag as uploaded source

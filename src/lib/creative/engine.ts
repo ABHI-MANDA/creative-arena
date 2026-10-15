@@ -5,8 +5,23 @@
  * the brand QC checklist.
  * ------------------------------------------------------------------ */
 
-import { KIND_LABELS, PLATFORM_KINDS, platformById, presetById, QC_CHECKLIST, type BrandSettings } from "./presets";
-import type { CreativeDesignStyle } from "./style-config";
+import {
+  KIND_LABELS,
+  PLATFORM_KINDS,
+  platformById,
+  presetById,
+  QC_CHECKLIST,
+  type AdFontColors,
+  type AdFontSizes,
+  type AdTextSection,
+  type BrandSettings,
+} from "./presets";
+import {
+  DEFAULT_SCRIM_SETTINGS,
+  type CreativeDesignStyle,
+  type ScrimSettings,
+} from "./style-config";
+export type { AdFontColors, AdFontSizes, AdTextSection } from "./presets";
 
 export type Brief = {
   name: string;
@@ -50,18 +65,6 @@ export type Direction = {
 export type Shot = { t: string; label: string; visual: string; line: string; tag: string };
 export type Caption = { platform: string; label: string; text: string };
 
-export type AdTextSection =
-  | "developer"
-  | "headline"
-  | "tagline"
-  | "bhk"
-  | "location"
-  | "amenities"
-  | "price"
-  | "cta";
-
-export type AdFontSizes = Partial<Record<AdTextSection, number>>;
-
 export type AssetPayload = {
   kicker?: string;
   headline?: string;
@@ -77,7 +80,9 @@ export type AssetPayload = {
   hex?: string[];
   layout?: "overlay" | "wide";
   designStyle?: CreativeDesignStyle;
-  fontSizes?: AdFontSizes;
+  fontSizes?: Partial<AdFontSizes>;
+  fontColors?: Partial<AdFontColors>;
+  scrimSettings?: ScrimSettings;
   shots?: Shot[];
   hook?: string;
   music?: string;
@@ -738,7 +743,9 @@ export type ApprovedAdContent = {
   imagePrompt: string;
   layout?: "automatic" | "poster" | "split";
   designStyle?: CreativeDesignStyle;
-  fontSizes?: AdFontSizes;
+  fontSizes?: Partial<AdFontSizes>;
+  fontColors?: Partial<AdFontColors>;
+  scrimSettings?: ScrimSettings;
   captions?: {
     instagram?: string;
     facebook?: string;
@@ -859,6 +866,7 @@ export type ComposeInput = {
   thresholds: { ready: number; review: number };
   override?: CopyOverride | null;
   approvedContent?: ApprovedAdContent | null;
+  typographyDefaults?: BrandSettings["typographyDefaults"];
   variant?: number;
   enabledKinds?: string[];
 };
@@ -892,11 +900,16 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
           imagePrompt: ac.imagePrompt,
         layout: ac.layout === "poster" ? "overlay" : ac.layout === "split" ? "wide" : payload.layout,
         designStyle: ac.designStyle ?? "editorial",
-        fontSizes: ac.fontSizes,
+        fontSizes: ac.fontSizes ?? input.typographyDefaults?.fontSizes,
+        fontColors: ac.fontColors ?? input.typographyDefaults?.fontColors,
+        scrimSettings: ac.scrimSettings ?? DEFAULT_SCRIM_SETTINGS,
         variant,
         }
       : {
           ...payload,
+          fontSizes: input.typographyDefaults?.fontSizes,
+          fontColors: input.typographyDefaults?.fontColors,
+          scrimSettings: DEFAULT_SCRIM_SETTINGS,
           variant,
           cta:
             payload.cta && !payload.cta.toLowerCase().includes("1234567890") && !/\d{8,}/.test(payload.cta)
@@ -1046,6 +1059,8 @@ export function recomposeAsset(prev: {
   payload: AssetPayload;
 }, ctx: ComposeInput, variant: number): { payload: AssetPayload; qc: QCResult } {
   const rebuilt = composeAssets({ ...ctx, platformIds: [prev.platform], variant }).find((a) => a.kind === prev.kind);
-  const payload = rebuilt?.payload ?? { ...prev.payload, variant };
+  const payload = rebuilt
+    ? { ...rebuilt.payload, scrimSettings: prev.payload.scrimSettings ?? rebuilt.payload.scrimSettings }
+    : { ...prev.payload, variant };
   return { payload, qc: qualityCheck(`${ctx.brief.name}:${prev.platform}:${prev.kind}:${variant}`, ctx.thresholds) };
 }

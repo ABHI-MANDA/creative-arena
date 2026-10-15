@@ -142,6 +142,8 @@ function CampaignWizard() {
     layout: contentDraft.layout === "poster" ? "overlay" : contentDraft.layout === "split" ? "wide" : undefined,
     designStyle: contentDraft.designStyle ?? "editorial",
     fontSizes: contentDraft.fontSizes,
+    fontColors: contentDraft.fontColors,
+    scrimSettings: contentDraft.scrimSettings,
   } : null;
   const previewAsset = previewPayload ? {
     kind: "hero",

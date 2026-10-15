@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Loader2, Lock, Palette, ShieldCheck } from "lucide-react";
-import type { BrandSettings } from "@/lib/creative/presets";
+import { Check, Loader2, Lock, Palette, ShieldCheck, Type } from "lucide-react";
+import { AD_TEXT_SECTIONS, type AdTextSection, type BrandSettings } from "@/lib/creative/presets";
 import { AdCreative } from "@/components/ad-creative";
 import { cx } from "@/lib/utils";
+import { DEFAULT_SCRIM_SETTINGS } from "@/lib/creative/style-config";
 
 const TONES = ["Elegant", "Trustworthy", "Bold", "Warm", "Minimal", "Aspirational", "Technical", "Playful"];
 
@@ -12,6 +13,7 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
   const [brand, setBrand] = useState<BrandSettings>(initial);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const set = <K extends keyof BrandSettings>(k: K, v: BrandSettings[K]) =>
     setBrand((b) => ({ ...b, [k]: v }));
@@ -19,17 +21,36 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
   const toggleTone = (t: string) =>
     set("tones", brand.tones.includes(t) ? brand.tones.filter((x) => x !== t) : [...brand.tones, t]);
 
+  const setFontSize = (section: AdTextSection, value: number) =>
+    set("typographyDefaults", {
+      ...brand.typographyDefaults,
+      fontSizes: { ...brand.typographyDefaults.fontSizes, [section]: value },
+    });
+
+  const setFontColor = (section: AdTextSection, value: string) =>
+    set("typographyDefaults", {
+      ...brand.typographyDefaults,
+      fontColors: { ...brand.typographyDefaults.fontColors, [section]: value },
+    });
+
   const save = async () => {
     setBusy(true);
     setSaved(false);
-    await fetch("/api/brand", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(brand),
-    });
-    setBusy(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2200);
+    setSaveError("");
+    try {
+      const response = await fetch("/api/brand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(brand),
+      });
+      if (!response.ok) throw new Error("Could not save the Brand Kit.");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2200);
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : "Could not save the Brand Kit.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const preview = {
@@ -44,6 +65,9 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
       cta: "Explore Residences",
       image: "/images/props/villa-hero.jpg",
       hex: ["#0B0A08", brand.color, "#8C6B4A"],
+      fontSizes: brand.typographyDefaults.fontSizes,
+      fontColors: brand.typographyDefaults.fontColors,
+      scrimSettings: DEFAULT_SCRIM_SETTINGS,
     },
   };
 
@@ -54,7 +78,7 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
         <h1 className="font-display mt-2 text-[34px] font-medium leading-tight">One brand. <span className="gold-text italic">Every frame.</span></h1>
         <p className="mt-3 max-w-2xl text-[13.5px] leading-relaxed text-mute">
           Templates inherit these tokens instantly. QC thresholds decide when an asset may be marked
-          Ready to Post — tune them to your team's bar.
+          Ready to Post — tune them to your team&apos;s bar.
         </p>
       </div>
 
@@ -94,6 +118,49 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
 
           <div className="mt-8 border-t border-line pt-6">
             <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.26em] text-mute">
+              <Type size={13} className="text-gold" /> Typography defaults
+            </div>
+            <p className="mb-5 text-[12px] leading-relaxed text-faint">
+              Set baseline size and color per copy line. These apply to new campaign generations.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {AD_TEXT_SECTIONS.map(({ key, label }) => (
+                <div key={key} className="rounded-xl border border-line bg-coal/60 p-3.5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <label htmlFor={`brand-font-size-${key}`} className="text-[11.5px] font-medium text-cream/90">
+                      {label}
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] text-gold">
+                        {brand.typographyDefaults.fontSizes[key]}%
+                      </span>
+                      <input
+                        type="color"
+                        aria-label={`${label} color`}
+                        value={brand.typographyDefaults.fontColors[key]}
+                        onChange={(event) => setFontColor(key, event.target.value)}
+                        className="h-7 w-8 cursor-pointer rounded border border-line bg-panel"
+                      />
+                    </label>
+                  </div>
+                  <input
+                    id={`brand-font-size-${key}`}
+                    type="range"
+                    min={75}
+                    max={140}
+                    step={5}
+                    value={brand.typographyDefaults.fontSizes[key]}
+                    onChange={(event) => setFontSize(key, Number(event.target.value))}
+                    className="w-full accent-[var(--gold)]"
+                    aria-label={`${label} font size`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-line pt-6">
+            <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.26em] text-mute">
               <ShieldCheck size={13} className="text-gold" /> Quality gates
             </div>
             <p className="mb-5 text-[12px] leading-relaxed text-faint">
@@ -127,6 +194,8 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
           <div className="mt-8 flex items-center justify-between border-t border-line pt-5">
             {saved ? (
               <span className="flex items-center gap-1.5 text-[12.5px] text-sage"><Check size={14} /> Brand kit saved</span>
+            ) : saveError ? (
+              <span role="alert" className="text-[12px] text-rust">{saveError}</span>
             ) : (
               <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">Changes apply to all new generations</span>
             )}

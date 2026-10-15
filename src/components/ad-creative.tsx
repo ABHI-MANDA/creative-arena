@@ -3,7 +3,11 @@ import type { AdTextSection, AssetPayload } from "@/lib/creative/engine";
 import type { BrandSettings } from "@/lib/creative/presets";
 import { platformById } from "@/lib/creative/presets";
 import { aspectCss, cx, ratioOf } from "@/lib/utils";
-import { CREATIVE_STYLE_CONFIG, resolveCreativeStyle } from "@/lib/creative/style-config";
+import {
+  CREATIVE_STYLE_CONFIG,
+  contrastingTextBackground,
+  resolveCreativeStyle,
+} from "@/lib/creative/style-config";
 import { BadgeCheck, Film, MapPin } from "lucide-react";
 import { ScoreRing } from "./ui";
 
@@ -37,6 +41,22 @@ function scaledFontSize(
     ? Math.min(1.4, Math.max(0.75, percentage / 100))
     : 1;
   return `clamp(${formatNumber(minimum * scale)}px, ${formatNumber(preferred * scale)}cqw, ${formatNumber(maximum * scale)}px)`;
+}
+
+function textColor(payload: AssetPayload, section: AdTextSection, fallback: string): string {
+  const color = payload.fontColors?.[section];
+  return typeof color === "string" && /^#[\da-f]{6}$/i.test(color) ? color : fallback;
+}
+
+function scrimGradient(payload: AssetPayload, fallbackColor: string, fallbackFade: string): string {
+  const settings = payload.scrimSettings;
+  if (!settings) return `linear-gradient(180deg, ${fallbackColor} 0%, ${fallbackFade} 48%)`;
+  const color = /^#[\da-f]{6}$/i.test(settings.color) ? settings.color : "#0c1012";
+  const channels = [1, 3, 5].map((offset) => Number.parseInt(color.slice(offset, offset + 2), 16));
+  const opacity = Math.min(100, Math.max(0, settings.opacity)) / 100;
+  const height = Math.min(90, Math.max(10, settings.height));
+  const rgb = channels.join(", ");
+  return `linear-gradient(180deg, rgba(${rgb}, ${opacity}) 0%, rgba(${rgb}, 0) ${height}%)`;
 }
 
 /* ---------- brand lock-up ---------- */
@@ -158,7 +178,7 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
           className="font-sans font-bold tracking-[0.18em] text-white"
           style={{
             fontSize: scaledFontSize(p, "developer", 11, 3.2, 28),
-            color: style.colors.text,
+            color: textColor(p, "developer", style.colors.text),
             fontFamily: style.typography.sans,
             textShadow: style.effects.textShadow,
           }}
@@ -173,7 +193,7 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
             fontSize: bold
               ? scaledFontSize(p, "headline", 22, 7.2, 72)
               : scaledFontSize(p, "headline", 20, 6.4, 64),
-            color: style.colors.text,
+            color: textColor(p, "headline", style.colors.text),
             textShadow: style.effects.headlineShadow,
             fontFamily: minimal ? style.typography.sans : undefined,
           }}
@@ -187,6 +207,7 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
             className="font-sans font-semibold tracking-[0.16em] text-white/95"
             style={{
               fontSize: scaledFontSize(p, "tagline", 9, 2.3, 22),
+              color: textColor(p, "tagline", style.colors.text),
               textShadow: "0 2px 12px rgba(0,0,0,.9), 0 1px 2px rgba(0,0,0,1)",
             }}
           >
@@ -200,6 +221,7 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
           className="font-sans font-black tracking-tight text-white leading-none mt-[1.6cqw]"
           style={{
             fontSize: scaledFontSize(p, "bhk", 24, 7.6, 76),
+            color: textColor(p, "bhk", style.colors.text),
             textShadow: "0 4px 24px rgba(0,0,0,1), 0 1px 3px rgba(0,0,0,1)",
           }}
         >
@@ -211,6 +233,7 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
           className="font-sans font-semibold tracking-[0.22em] text-white/95 mt-[1.1cqw]"
           style={{
             fontSize: scaledFontSize(p, "location", 8, 2.2, 20),
+            color: textColor(p, "location", style.colors.mutedText),
             textShadow: "0 2px 12px rgba(0,0,0,.9), 0 1px 2px rgba(0,0,0,1)",
           }}
         >
@@ -222,6 +245,7 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
           className="font-sans font-medium tracking-[0.12em] text-white/90 mt-[1.1cqw]"
           style={{
             fontSize: scaledFontSize(p, "amenities", 8, 1.95, 18),
+            color: textColor(p, "amenities", style.colors.mutedText),
             textShadow: "0 2px 10px rgba(0,0,0,.9), 0 1px 2px rgba(0,0,0,1)",
           }}
         >
@@ -232,7 +256,7 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
         {price && <div className={cx("mt-[1.8cqw] flex flex-col", minimal ? "items-start" : "items-center")}>
           <div
             className="font-sans font-semibold tracking-[0.2em] text-white/85 flex items-center gap-[1.5cqw]"
-            style={{ fontSize: scaledFontSize(p, "price", 7.5, 1.8, 16) }}
+            style={{ fontSize: scaledFontSize(p, "price", 7.5, 1.8, 16), color: textColor(p, "price", style.colors.mutedText) }}
           >
             <span className="w-[6cqw] h-[1px] bg-white/40" />
             <span>STARTING FROM</span>
@@ -242,6 +266,7 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
             className="font-sans font-black text-white leading-none mt-[0.5cqw]"
             style={{
               fontSize: scaledFontSize(p, "price", 18, 5.6, 54),
+              color: textColor(p, "price", style.colors.text),
               letterSpacing: "-0.01em",
               textShadow: "0 3px 20px rgba(0,0,0,1), 0 1px 3px rgba(0,0,0,1)",
             }}
@@ -262,8 +287,8 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
             bold && "uppercase"
           )}
           style={{
-            background: style.colors.ctaBackground,
-            color: style.colors.ctaForeground,
+            background: contrastingTextBackground(textColor(p, "cta", style.colors.ctaForeground)),
+            color: textColor(p, "cta", style.colors.ctaForeground),
             padding: "1.8cqw 2cqw",
             fontSize: bold
               ? scaledFontSize(p, "cta", 12, 3, 28)
@@ -290,6 +315,11 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
   const p = asset.payload;
   const style = resolveCreativeStyle(p.hex, p.designStyle);
   const { dark, accent } = style.colors;
+  const photoScrim = scrimGradient(
+    p,
+    style.canvasExport.topScrimColor,
+    style.canvasExport.topScrimFade
+  );
   const { developer, project } = parseDeveloperAndProject(p.kicker, p.headline, brand.name);
   const bhk = parseBhk(p.subline, p.kicker);
   const tagline = p.fine?.toUpperCase() ?? "";
@@ -317,7 +347,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
           {/* Developer / Brand */}
           <div
             className="font-sans font-bold tracking-[0.18em] text-white/90"
-            style={{ fontSize: scaledFontSize(p, "developer", 9, 1.8, 18) }}
+            style={{ fontSize: scaledFontSize(p, "developer", 9, 1.8, 18), color: textColor(p, "developer", style.colors.text) }}
           >
             {developer}
           </div>
@@ -325,7 +355,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
           {/* Project Title */}
           <h2
             className="font-sans font-extrabold uppercase tracking-[0.06em] text-white leading-tight mt-[0.6cqw]"
-            style={{ fontSize: scaledFontSize(p, "headline", 16, 3.6, 36) }}
+            style={{ fontSize: scaledFontSize(p, "headline", 16, 3.6, 36), color: textColor(p, "headline", style.colors.text) }}
           >
             {project}
           </h2>
@@ -334,7 +364,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
           {tagline && <div className="mt-[0.6cqw]">
             <p
               className="font-sans font-semibold tracking-[0.14em] text-white/90"
-              style={{ fontSize: scaledFontSize(p, "tagline", 8, 1.4, 14) }}
+              style={{ fontSize: scaledFontSize(p, "tagline", 8, 1.4, 14), color: textColor(p, "tagline", style.colors.text) }}
             >
               {tagline}
             </p>
@@ -344,7 +374,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
           {/* BHK Highlight */}
           {bhk && <div
             className="font-sans font-black tracking-tight text-white leading-none mt-[1.2cqw]"
-            style={{ fontSize: scaledFontSize(p, "bhk", 18, 4.2, 42) }}
+            style={{ fontSize: scaledFontSize(p, "bhk", 18, 4.2, 42), color: textColor(p, "bhk", style.colors.text) }}
           >
             {bhk}
           </div>}
@@ -352,7 +382,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
           {/* Amenities Line */}
           {amenitiesLine && <div
             className="font-sans font-medium tracking-[0.1em] text-white/85 mt-[0.8cqw]"
-            style={{ fontSize: scaledFontSize(p, "amenities", 7, 1.3, 13) }}
+            style={{ fontSize: scaledFontSize(p, "amenities", 7, 1.3, 13), color: textColor(p, "amenities", style.colors.mutedText) }}
           >
             {amenitiesLine}
           </div>}
@@ -361,7 +391,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
           {price && <div className="mt-[1.2cqw] flex flex-col">
             <div
               className="font-sans font-semibold tracking-[0.18em] text-white/80 flex items-center gap-[0.8cqw]"
-              style={{ fontSize: scaledFontSize(p, "price", 7, 1.2, 12) }}
+              style={{ fontSize: scaledFontSize(p, "price", 7, 1.2, 12), color: textColor(p, "price", style.colors.mutedText) }}
             >
               <span className="w-[3cqw] h-[1px] bg-white/40" />
               <span>STARTING FROM</span>
@@ -369,7 +399,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
             </div>
             <div
               className="font-sans font-black text-white leading-none mt-[0.4cqw]"
-              style={{ fontSize: scaledFontSize(p, "price", 14, 3.2, 32) }}
+              style={{ fontSize: scaledFontSize(p, "price", 14, 3.2, 32), color: textColor(p, "price", style.colors.text) }}
             >
               {price}
             </div>
@@ -381,8 +411,8 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
           <div
             className="w-full text-center font-sans font-bold text-[#0c120e] mt-auto"
             style={{
-              background: style.colors.ctaBackground,
-              color: style.colors.ctaForeground,
+              background: contrastingTextBackground(textColor(p, "cta", style.colors.ctaForeground)),
+              color: textColor(p, "cta", style.colors.ctaForeground),
               padding: "1.2cqw 1.6cqw",
               fontSize: scaledFontSize(p, "cta", 9, 1.6, 16),
               letterSpacing: "0.06em",
@@ -410,9 +440,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
         )}
         <div
           className="ad-wide-scrim"
-          style={{
-            backgroundImage: `linear-gradient(180deg, ${style.canvasExport.topScrimColor} 0%, ${style.canvasExport.topScrimFade} 48%), linear-gradient(90deg, ${dark}cc, transparent 35%)`
-          }}
+          style={{ backgroundImage: photoScrim }}
         />
       </div>
     </div>
@@ -436,6 +464,11 @@ export function AdCreative({
   const wide = asset.payload.layout ? asset.payload.layout === "wide" : ["linkedin", "portal"].includes(asset.platform);
   const style = resolveCreativeStyle(asset.payload.hex, asset.payload.designStyle);
   const { dark, accent } = style.colors;
+  const photoScrim = scrimGradient(
+    asset.payload,
+    style.canvasExport.topScrimColor,
+    style.canvasExport.topScrimFade
+  );
   const frameStyle: CreativeFrameStyle = {
     aspectRatio: aspectCss(asset.aspect),
     borderRadius: "inherit",
@@ -472,7 +505,7 @@ export function AdCreative({
           <div
             className="ad-scrim"
             style={{
-              backgroundImage: `linear-gradient(180deg, ${style.canvasExport.topScrimColor} 0%, ${style.canvasExport.topScrimFade} 48%)`,
+              backgroundImage: photoScrim,
             }}
           />
           {/* Subtle color grading layer tying visual into project Creative DNA */}

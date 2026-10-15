@@ -109,12 +109,65 @@ export const KIND_BLURBS: Record<string, string> = {
 
 export const DEFAULT_THRESHOLDS = { ready: 95, review: 80 };
 
+export type AdTextSection =
+  | "developer"
+  | "headline"
+  | "tagline"
+  | "bhk"
+  | "location"
+  | "amenities"
+  | "price"
+  | "cta";
+
+export type AdFontSizes = Record<AdTextSection, number>;
+export type AdFontColors = Record<AdTextSection, string>;
+
+export const AD_TEXT_SECTIONS: { key: AdTextSection; label: string }[] = [
+  { key: "developer", label: "Developer Name" },
+  { key: "headline", label: "Headline" },
+  { key: "tagline", label: "Tagline" },
+  { key: "bhk", label: "Config BHK" },
+  { key: "location", label: "Location" },
+  { key: "amenities", label: "Amenities" },
+  { key: "price", label: "Price" },
+  { key: "cta", label: "CTA" },
+];
+
+export type BrandTypographyDefaults = {
+  fontSizes: AdFontSizes;
+  fontColors: AdFontColors;
+};
+
+export const DEFAULT_BRAND_TYPOGRAPHY: BrandTypographyDefaults = {
+  fontSizes: {
+    developer: 100,
+    headline: 100,
+    tagline: 100,
+    bhk: 100,
+    location: 100,
+    amenities: 100,
+    price: 100,
+    cta: 100,
+  },
+  fontColors: {
+    developer: "#ffffff",
+    headline: "#ffffff",
+    tagline: "#ffffff",
+    bhk: "#ffffff",
+    location: "#ffffff",
+    amenities: "#ffffff",
+    price: "#ffffff",
+    cta: "#ffffff",
+  },
+};
+
 export type BrandSettings = {
   name: string;
   mark: string;
   color: string;
   domain: string;
   tones: string[];
+  typographyDefaults: BrandTypographyDefaults;
   thresholds: { ready: number; review: number };
 };
 
@@ -124,8 +177,36 @@ export const DEFAULT_BRAND: BrandSettings = {
   color: "#D9AB5E",
   domain: "",
   tones: ["Elegant", "Trustworthy"],
+  typographyDefaults: DEFAULT_BRAND_TYPOGRAPHY,
   thresholds: DEFAULT_THRESHOLDS,
 };
+
+export function mergeBrandSettings(value: Partial<BrandSettings> = {}): BrandSettings {
+  const typography = value.typographyDefaults;
+  const fontSizes = { ...DEFAULT_BRAND_TYPOGRAPHY.fontSizes };
+  const fontColors = { ...DEFAULT_BRAND_TYPOGRAPHY.fontColors };
+
+  for (const { key } of AD_TEXT_SECTIONS) {
+    const size = typography?.fontSizes?.[key];
+    if (typeof size === "number" && Number.isFinite(size)) {
+      fontSizes[key] = Math.min(140, Math.max(75, size));
+    }
+    const color = typography?.fontColors?.[key];
+    if (typeof color === "string" && /^#[\da-f]{6}$/i.test(color)) {
+      fontColors[key] = color;
+    }
+  }
+
+  return {
+    ...DEFAULT_BRAND,
+    ...value,
+    typographyDefaults: { fontSizes, fontColors },
+    thresholds: {
+      ...DEFAULT_BRAND.thresholds,
+      ...value.thresholds,
+    },
+  };
+}
 
 export const QC_CHECKLIST = [
   "Property accuracy",

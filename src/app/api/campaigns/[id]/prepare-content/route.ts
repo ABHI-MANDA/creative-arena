@@ -8,6 +8,7 @@ import {
 } from "@/lib/creative/engine";
 import { DEFAULT_TEMPLATE_LIBRARY, TEMPLATE_LIBRARY_KEY, type TemplateLibrary } from "@/lib/creative/template-library";
 import { isFreeOpenRouterModel, resolveOpenRouterModel } from "@/lib/creative/models";
+import { DEFAULT_SCRIM_SETTINGS } from "@/lib/creative/style-config";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       brand?.name,
       bundle.campaign.preset
     );
+    draftContent.fontSizes = brand.typographyDefaults.fontSizes;
+    draftContent.fontColors = brand.typographyDefaults.fontColors;
+    draftContent.scrimSettings = DEFAULT_SCRIM_SETTINGS;
 
     await setAppSetting(`campaign-draft-content:${id}`, draftContent);
 

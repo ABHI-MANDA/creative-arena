@@ -30,6 +30,7 @@ import {
   RotateCcw,
   Save,
   Shield,
+  SlidersHorizontal,
   Square,
   Type,
   Trash2,
@@ -49,7 +50,11 @@ import {
   type ObjectMeta,
 } from "@/lib/editor/fabric-adapter";
 import { cx } from "@/lib/utils";
-import { resolveCreativeStyle } from "@/lib/creative/style-config";
+import {
+  DEFAULT_SCRIM_SETTINGS,
+  SCRIM_PRESETS,
+  type ScrimSettings,
+} from "@/lib/creative/style-config";
 
 export type AdAssetLike = {
   id: string;
@@ -120,7 +125,10 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
   const { width: targetWidth, height: targetHeight } = getCanvasDimensions(asset.aspect);
 
   /* Editor Mode */
-  const [activeTab, setActiveTab] = useState<"text" | "shapes" | "images" | "brand" | "layers">("layers");
+  const [activeTab, setActiveTab] = useState<"text" | "shapes" | "images" | "brand" | "scrim" | "layers">("layers");
+  const [scrimSettings, setScrimSettings] = useState<ScrimSettings>(
+    asset.payload.scrimSettings ?? DEFAULT_SCRIM_SETTINGS
+  );
   const [previewMode, setPreviewMode] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
@@ -204,6 +212,26 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
       setCanRedo(false);
     } catch {}
   }, []);
+
+  const updateScrim = useCallback((settings: ScrimSettings, recordHistory = false) => {
+    setScrimSettings(settings);
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+
+    const currentAsset = assetRef.current;
+    const isWide = currentAsset.payload.layout
+      ? currentAsset.payload.layout === "wide"
+      : ["linkedin", "portal"].includes(currentAsset.platform) || currentAsset.aspect === "16:9";
+    syncGeneratedImageGradient(
+      canvas,
+      isWide ? "wide" : "poster",
+      targetWidth,
+      targetHeight,
+      settings
+    );
+    canvas.renderAll();
+    if (recordHistory) pushHistory();
+  }, [pushHistory, targetHeight, targetWidth]);
 
   const updateLayersList = useCallback(() => {
     if (!fabricCanvasRef.current) return;
@@ -409,18 +437,13 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
               const currentAsset = assetRef.current;
               const isWide = currentAsset.payload.layout
                 ? currentAsset.payload.layout === "wide"
-                : ["linkedin", "portal"].includes(currentAsset.platform);
-              const creativeStyle = resolveCreativeStyle(
-                currentAsset.payload.hex,
-                currentAsset.payload.designStyle
-              );
+                : ["linkedin", "portal"].includes(currentAsset.platform) || currentAsset.aspect === "16:9";
               syncGeneratedImageGradient(
                 canvas,
                 isWide ? "wide" : "poster",
                 targetWidth,
                 targetHeight,
-                creativeStyle.canvasExport.topScrimColor,
-                creativeStyle.canvasExport.topScrimFade
+                currentAsset.payload.scrimSettings ?? DEFAULT_SCRIM_SETTINGS
               );
               constrainCanvasObjects(canvas);
               const curScale = effectiveScaleRef.current;
@@ -930,6 +953,7 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
 
     const currentAsset = assetRef.current;
     const currentBrand = brandRef.current;
+    setScrimSettings(currentAsset.payload.scrimSettings ?? DEFAULT_SCRIM_SETTINGS);
 
     populateDefaultFabricObjects(
       canvas,
@@ -1029,6 +1053,7 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
         body: JSON.stringify({
           action: "save_design",
           designJson,
+          payload: { scrimSettings },
         }),
       });
 
@@ -1100,6 +1125,7 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
         body: JSON.stringify({
           action: "save_design",
           designJson,
+          payload: { scrimSettings },
         }),
       });
 
@@ -1218,6 +1244,7 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
               { id: "shapes", label: "Shapes", icon: Square },
               { id: "images", label: "Images", icon: ImageIcon },
               { id: "brand", label: "Brand", icon: Palette },
+              { id: "scrim", label: "Scrim", icon: SlidersHorizontal },
               { id: "layers", label: "Layers", icon: Layers },
             ].map((tab) => (
               <button
@@ -1349,6 +1376,81 @@ export function CreativeEditorModal({ asset, brand, onClose, onSaveSuccess }: Pr
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {activeTab === "scrim" && (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">Image Scrim</h3>
+                  <p className="mt-2 text-[11px] leading-relaxed text-faint">
+                    Tune the gradient over the photo to improve text contrast. Changes update on the canvas immediately.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {SCRIM_PRESETS.map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => updateScrim(preset.settings, true)}
+                      className="rounded-lg border border-line bg-coal px-2.5 py-2 text-[10.5px] text-mute transition-colors hover:border-gold/50 hover:text-cream"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                <label className="block">
+                  <span className="mb-2 flex items-center justify-between text-[11px]">
+                    <span className="text-cream/85">Opacity</span>
+                    <span className="font-mono text-gold">{scrimSettings.opacity}%</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={scrimSettings.opacity}
+                    onChange={(event) => updateScrim({ ...scrimSettings, opacity: Number(event.target.value) })}
+                    onPointerUp={() => updateScrim(scrimSettings, true)}
+                    onKeyUp={() => updateScrim(scrimSettings, true)}
+                    className="w-full accent-[var(--gold)]"
+                    aria-label="Scrim opacity"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 flex items-center justify-between text-[11px]">
+                    <span className="text-cream/85">Height coverage</span>
+                    <span className="font-mono text-gold">{scrimSettings.height}%</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={10}
+                    max={90}
+                    value={scrimSettings.height}
+                    onChange={(event) => updateScrim({ ...scrimSettings, height: Number(event.target.value) })}
+                    onPointerUp={() => updateScrim(scrimSettings, true)}
+                    onKeyUp={() => updateScrim(scrimSettings, true)}
+                    className="w-full accent-[var(--gold)]"
+                    aria-label="Scrim height coverage"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between rounded-lg border border-line bg-coal px-3 py-2.5">
+                  <span className="text-[11px] text-cream/85">Scrim color</span>
+                  <span className="flex items-center gap-2 font-mono text-[10px] text-mute">
+                    {scrimSettings.color}
+                    <input
+                      type="color"
+                      value={scrimSettings.color}
+                      onChange={(event) => updateScrim({ ...scrimSettings, color: event.target.value })}
+                      onBlur={() => updateScrim(scrimSettings, true)}
+                      aria-label="Scrim color"
+                      className="h-7 w-8 cursor-pointer rounded border border-line bg-panel"
+                    />
+                  </span>
+                </label>
               </div>
             )}
 

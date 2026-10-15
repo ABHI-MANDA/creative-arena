@@ -16,6 +16,7 @@ import {
 } from "./schema";
 import {
   DEFAULT_BRAND,
+  mergeBrandSettings,
   type BrandSettings,
 } from "@/lib/creative/presets";
 import { analyzeDNA, type DNA, type AssetPayload } from "@/lib/creative/engine";
@@ -31,7 +32,7 @@ export async function getBrand(): Promise<BrandSettings> {
       if (isLocalJsonDb) {
         return await readLocalDatabase((database) => {
           const row = database.settings.find((entry) => entry.key === "brand");
-          return row ? { ...DEFAULT_BRAND, ...(row.value as Partial<BrandSettings>) } : DEFAULT_BRAND;
+          return row ? mergeBrandSettings(row.value as Partial<BrandSettings>) : DEFAULT_BRAND;
         });
       }
       const rows = await db
@@ -41,7 +42,7 @@ export async function getBrand(): Promise<BrandSettings> {
         .limit(1);
       recordDbMetric("getBrand", Date.now() - started, 1, 400);
       if (!rows.length) return DEFAULT_BRAND;
-      return { ...DEFAULT_BRAND, ...(rows[0].value as Partial<BrandSettings>) };
+      return mergeBrandSettings(rows[0].value as Partial<BrandSettings>);
     } catch {
       return DEFAULT_BRAND;
     }

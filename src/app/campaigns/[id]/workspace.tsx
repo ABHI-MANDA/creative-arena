@@ -32,13 +32,13 @@ import type { AssetPayload, Direction } from "@/lib/creative/engine";
 import { KIND_LABELS, PLATFORMS, platformById, type BrandSettings } from "@/lib/creative/presets";
 import { cx, ratioOf } from "@/lib/utils";
 import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
 import { AdCreative, AssetVisual } from "@/components/ad-creative";
 import { PipelineOverlay } from "@/components/pipeline";
 import { QualityPanel } from "@/components/quality";
 import { Storyboard } from "@/components/storyboard";
 import { Chip, DynIcon, SectionHead, StatusPill } from "@/components/ui";
 import { ReviewContentModal } from "@/components/campaigns/ReviewContentModal";
-import { resolveCreativeStyle } from "@/lib/creative/style-config";
 
 const CreativeEditorModal = dynamic(
   () => import("@/components/editor/CreativeEditorModal").then((mod) => mod.CreativeEditorModal),
@@ -81,6 +81,7 @@ async function ensureBase64DataUrl(url: string): Promise<string> {
   if (!url || url.startsWith("data:")) return url;
 
   const targetUrl = url.startsWith("/") ? `${window.location.origin}${url}` : url;
+  let lastError: unknown;
 
   // 1. Try direct fetch
   try {
@@ -94,7 +95,10 @@ async function ensureBase64DataUrl(url: string): Promise<string> {
         reader.readAsDataURL(blob);
       });
     }
-  } catch {}
+    lastError = new Error(`Image request failed with status ${res.status}`);
+  } catch (error) {
+    lastError = error;
+  }
 
   // 2. Try server-side proxy fetch (bypasses CORS restrictions & prevents canvas tainting)
   try {
@@ -109,27 +113,13 @@ async function ensureBase64DataUrl(url: string): Promise<string> {
         reader.readAsDataURL(blob);
       });
     }
-  } catch {}
+    lastError = new Error(`Image proxy request failed with status ${res.status}`);
+  } catch (error) {
+    lastError = error;
+  }
 
-  // 3. Image element fallback
-  return new Promise<string>((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth || img.width || 800;
-        canvas.height = img.naturalHeight || img.height || 600;
-        const ctx = canvas.getContext("2d");
-        if (ctx) ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL("image/jpeg", 0.92));
-      } catch {
-        resolve(url);
-      }
-    };
-    img.onerror = () => resolve(url);
-    img.src = targetUrl;
-  });
+  const reason = lastError instanceof Error ? ` (${lastError.message})` : "";
+  throw new Error(`Could not load image for preview export: ${targetUrl}${reason}`);
 }
 
 function getTargetDimensions(aspect: string): { width: number; height: number } {
@@ -142,157 +132,6 @@ function getTargetDimensions(aspect: string): { width: number; height: number } 
   const width = 1080;
   const height = Math.round((width * (hRatio || 1)) / (wRatio || 1));
   return { width, height };
-}
-
-function renderCanvasFallback(asset: AssetLite, format: ImageExportFormat): Promise<Blob> {
-  return new Promise(async (resolve) => {
-    const { width, height } = getTargetDimensions(asset.aspect);
-    const style = resolveCreativeStyle(asset.payload.hex, asset.payload.designStyle);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      resolve(new Blob([], { type: format === "jpeg" ? "image/jpeg" : "image/png" }));
-      return;
-    }
-
-    // 1. Dark base
-    ctx.fillStyle = style.canvasExport.background;
-    ctx.fillRect(0, 0, width, height);
-
-    // 2. Draw property photo background
-    const p = asset.payload;
-    if (p.image) {
-      try {
-        const base64Url = await ensureBase64DataUrl(p.image);
-        if (base64Url) {
-          await new Promise<void>((resImg) => {
-            const img = new Image();
-            img.onload = () => {
-              try {
-                const imgW = img.naturalWidth || img.width || 800;
-                const imgH = img.naturalHeight || img.height || 600;
-                const scale = Math.max(width / imgW, height / imgH);
-                const x = (width - imgW * scale) / 2;
-                const y = (height - imgH * scale) / 2;
-                ctx.filter = style.image.filter;
-                ctx.drawImage(img, x, y, imgW * scale, imgH * scale);
-                ctx.filter = "none";
-              } catch {}
-              resImg();
-            };
-            img.onerror = () => resImg();
-            img.src = base64Url;
-          });
-        }
-      } catch {}
-    }
-
-    // 3. Blue top scrim fades out before the image focal area.
-    const topGradient = ctx.createLinearGradient(0, 0, 0, height * 0.45);
-    topGradient.addColorStop(0, style.canvasExport.topScrimColor);
-    topGradient.addColorStop(1, style.canvasExport.topScrimFade);
-    ctx.fillStyle = topGradient;
-    ctx.fillRect(0, 0, width, height * 0.45);
-
-    // 4. Overlays & Typography
-    const margin = 54;
-    const contentW = width - margin * 2;
-
-    let topY = 70;
-    if (p.kicker) {
-      ctx.fillStyle = style.colors.accent;
-      ctx.font = `bold 20px ${style.typography.sans}`;
-      ctx.fillText(p.kicker.toUpperCase(), margin, topY);
-      topY += 42;
-    }
-
-    if (p.headline) {
-      ctx.fillStyle = style.colors.text;
-      ctx.font = `500 52px ${style.typography.display}`;
-      const words = p.headline.split(" ");
-      let line = "";
-      for (const w of words) {
-        const test = line + (line ? " " : "") + w;
-        if (ctx.measureText(test).width > contentW) {
-          ctx.fillText(line, margin, topY);
-          line = w;
-          topY += 58;
-        } else {
-          line = test;
-        }
-      }
-      if (line) {
-        ctx.fillText(line, margin, topY);
-        topY += 50;
-      }
-    }
-
-    if (p.subline) {
-      ctx.fillStyle = style.colors.mutedText;
-      ctx.font = `24px ${style.typography.sans}`;
-      ctx.fillText(p.subline, margin, topY);
-    }
-
-    let btmY = height - 60;
-
-    if (p.cta) {
-      const ctaText = (p.cta && !p.cta.toLowerCase().includes("1234567890") && !/\d{8,}/.test(p.cta) ? p.cta : "BOOK NOW").toUpperCase();
-      ctx.font = `bold 22px ${style.typography.sans}`;
-      const ctaW = ctx.measureText(ctaText).width + 48;
-      const ctaH = 50;
-      const ctaX = width - margin - ctaW;
-      const ctaY = btmY - 38;
-
-      ctx.fillStyle = style.colors.ctaBackground;
-      ctx.beginPath();
-      ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 25);
-      ctx.fill();
-
-      ctx.fillStyle = style.colors.ctaForeground;
-      ctx.fillText(ctaText, ctaX + 24, ctaY + 33);
-    }
-
-    if (p.priceLine) {
-      ctx.fillStyle = style.colors.text;
-      ctx.font = `bold 38px ${style.typography.display}`;
-      ctx.fillText(p.priceLine, margin, btmY);
-      btmY -= 54;
-    }
-
-    if (p.locationLabel) {
-      ctx.fillStyle = style.colors.mutedText;
-      ctx.font = `22px ${style.typography.sans}`;
-      ctx.fillText("📍  " + p.locationLabel, margin, btmY);
-      btmY -= 45;
-    }
-
-    const bullets = (p.bullets ?? []).slice(0, 3);
-    if (bullets.length > 0 && btmY > topY + 80) {
-      ctx.font = `18px ${style.typography.sans}`;
-      let bulletX = margin;
-      for (const bullet of bullets) {
-        const bText = "• " + bullet;
-        const bW = ctx.measureText(bText).width + 20;
-        if (bulletX + bW < width - margin) {
-          ctx.fillStyle = style.colors.mutedText;
-          ctx.fillText(bText, bulletX, btmY);
-          bulletX += bW;
-        }
-      }
-    }
-
-    const mime = format === "jpeg" ? "image/jpeg" : "image/png";
-    try {
-      const dataUrl = canvas.toDataURL(mime, 0.94);
-      resolve(dataUrlToBlob(dataUrl));
-    } catch {
-      resolve(new Blob([], { type: mime }));
-    }
-  });
 }
 
 async function renderAssetDOMToBlob(
@@ -316,7 +155,7 @@ async function renderAssetDOMToBlob(
   const root = createRoot(container);
 
   try {
-    await new Promise<void>((resolve) => {
+    flushSync(() => {
       root.render(
         <div style={{ width: `${targetWidth}px`, height: `${targetHeight}px`, position: "relative" }}>
           <AdCreative
@@ -328,7 +167,6 @@ async function renderAssetDOMToBlob(
           />
         </div>
       );
-      setTimeout(resolve, 140);
     });
 
     const frame = container.querySelector<HTMLElement>(".adframe");
@@ -341,20 +179,18 @@ async function renderAssetDOMToBlob(
     await Promise.all(
       imgs.map(async (img) => {
         if (img.src && !img.src.startsWith("data:")) {
-          try {
-            const base64 = await ensureBase64DataUrl(img.src);
-            if (base64 && base64.startsWith("data:")) {
-              img.src = base64;
-              if ("decode" in img) {
-                await img.decode().catch(() => {});
-              }
-            }
-          } catch {}
+          const base64 = await ensureBase64DataUrl(img.src);
+          if (!base64.startsWith("data:")) {
+            throw new Error(`Could not prepare preview image for export: ${img.src}`);
+          }
+          img.src = base64;
+          await img.decode();
         }
       })
     );
 
-    await new Promise((r) => setTimeout(r, 100));
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
     const options = {
       width: targetWidth,
@@ -369,32 +205,22 @@ async function renderAssetDOMToBlob(
       },
     };
 
-    frame.classList.add("ad-render-export");
     const { toJpeg, toPng } = await import("html-to-image");
     const dataUrl = format === "png"
       ? await toPng(frame, options)
       : await toJpeg(frame, { ...options, quality: 0.96 });
 
     const blob = dataUrlToBlob(dataUrl);
-    if (blob.size >= 15000) return blob;
+    if (blob.size > 0) return blob;
 
-    console.warn("Offscreen DOM snapshot payload too small, executing canvas fallback");
-    return await renderCanvasFallback(asset, format);
+    throw new Error("The creative preview produced an empty export.");
   } catch (err) {
-    console.warn("DOM export pipeline executing canvas fallback:", err);
-    return await renderCanvasFallback(asset, format);
+    console.error("Creative preview export failed:", err);
+    throw err;
   } finally {
-    setTimeout(() => {
-      try {
-        root.unmount();
-        container.remove();
-      } catch {}
-    }, 150);
+    root.unmount();
+    container.remove();
   }
-}
-
-async function renderAssetFile(assetId: string, format: ImageExportFormat): Promise<Blob> {
-  throw new Error("Use renderAssetDOMToBlob directly for complete preview rendering.");
 }
 
 async function persistAssetFile(assetId: string, format: ImageExportFormat, blob: Blob) {
@@ -889,8 +715,8 @@ export function CampaignWorkspace({
         try {
           blob = await renderAssetDOMToBlob(asset, brand, "png");
         } catch (err) {
-          console.warn(`Could not render asset frame ${asset.id}, using Canvas fallback:`, err);
-          blob = await renderCanvasFallback(asset, "png");
+          console.error(`Could not export creative preview ${asset.id}:`, err);
+          throw err;
         }
 
         if (blob) {

@@ -175,7 +175,7 @@ html[data-theme="light"] .backdrop {
   position: absolute; inset: 0;
   background: linear-gradient(180deg, rgba(52, 146, 201, 0.65) 0%, rgba(52, 146, 201, 0) 48%);
 }
-.ad-wide-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(52, 146, 201, 0.65) 0%, rgba(52, 146, 201, 0) 48%), linear-gradient(90deg, rgba(10,18,13,.58), transparent 44%); }
+.ad-wide-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(52, 146, 201, 0.65) 0%, rgba(52, 146, 201, 0) 48%); }
 .ad-poster-kicker { color: #f1d49a; font-family: var(--font-mono); font-size: clamp(8px, 2.05cqw, 18px); letter-spacing: 0.22em; text-shadow: 0 2px 12px rgba(0,0,0,.9), 0 1px 3px rgba(0,0,0,.95); }
 .ad-poster-title { max-width: 96%; margin: 1.4cqw auto 0; color: #fffdf5; font-family: var(--font-display); font-size: clamp(20px, 8.2cqw, 64px); font-weight: 500; line-height: 0.96; text-transform: uppercase; text-wrap: balance; overflow-wrap: anywhere; text-shadow: 0 3px 22px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,1); }
 .ad-poster-type { margin: 2cqw auto 0; color: rgba(255,253,245,.96); font-size: clamp(12px, 3.05cqw, 30px); font-weight: 600; line-height: 1.25; text-shadow: 0 2px 14px rgba(0,0,0,.9), 0 1px 2px rgba(0,0,0,1); }
@@ -187,14 +187,6 @@ html[data-theme="light"] .backdrop {
 .ad-poster-location svg { flex: none; color: #e5c788; }
 .ad-poster-price { color: #fffdf5; font-family: var(--font-display); font-size: clamp(16px, 3.8cqw, 36px); font-weight: 500; line-height: 1.15; text-shadow: 0 2px 14px rgba(0,0,0,.85); }
 .ad-poster-details .ad-cta { font-size: clamp(11px, 2.6cqw, 22px); letter-spacing: 0.08em; }
-.adframe.ad-render-export .ad-poster-kicker { font-size: 2.05cqw; }
-.adframe.ad-render-export .ad-poster-title { font-size: min(8.2cqw, 64px); }
-.adframe.ad-render-export .ad-poster-type { font-size: 3.05cqw; }
-.adframe.ad-render-export .ad-poster-tagline { font-size: 2.15cqw; }
-.adframe.ad-render-export .ad-poster-benefits span { font-size: 1.95cqw; }
-.adframe.ad-render-export .ad-poster-location { font-size: 2.3cqw; }
-.adframe.ad-render-export .ad-poster-price { font-size: 3.8cqw; }
-.adframe.ad-render-export .ad-poster-details .ad-cta { font-size: 2.6cqw; }
 .ad-kicker { font-size: 2.15cqw; letter-spacing: 0.34em; text-transform: uppercase; font-family: var(--font-mono); color: var(--color-gold); text-shadow: 0 2px 10px rgba(0,0,0,.85); }
 .ad-h { font-family: var(--font-display); font-weight: 480; font-size: 8.6cqw; line-height: 1.04; letter-spacing: -0.01em; text-wrap: balance; text-shadow: 0 3px 22px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,1); }
 .ad-h-ital { font-family: var(--font-display); font-style: italic; font-weight: 420; font-size: 9.4cqw; line-height: 1.02; letter-spacing: -0.015em; text-shadow: 0 3px 22px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,1); }
