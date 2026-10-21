@@ -7,6 +7,8 @@
 
 M & A is brief-driven, not prompt-driven. Marketing teams onboard a property via **live web link scraping**, photo upload, or structured brief. The platform analyzes the property's **Creative DNA**, proposes **3 creative directions**, generates high-fidelity photorealistic architecture via **Agnes AI / FLUX**, halts for a **Content Review & Approval Stage**, allows in-browser graphic editing via **Fabric.js**, verifies compliance with an **11-point Brand Quality Check**, and exports a downloadable **high-resolution campaign package** across **8 distinct aspect ratios**.
 
+At review, users can edit the image-generation prompt. When an approved prompt is supplied, that text is sent directly to image generation without AI rewriting or appended composition/architecture guidance. Without an approved prompt, the prompt writer applies a deterministic campaign-specific architecture variation. Generation failures are reported instead of silently substituting an uploaded property image. Each generated asset records the provider model that returned it.
+
 ---
 
 ## Table of Contents
@@ -107,7 +109,7 @@ flowchart TD
   - **Key Amenities Line** (pipe-separated highlights)
   - **Starting Price Tag** (e.g. *₹ 1.85 Cr* Onwards*)
   - **CTA Button Text** (defaulting to `"BOOK NOW"`)
-  - **AI Visual Prompt** (customized architectural prompt sent to Agnes AI / FLUX)
+  - **AI Visual Prompt** (the approved text is sent directly to image generation; it is not rewritten by the prompt-writing model)
 - **Live Interactive Mock Preview**: Live card updates in real time as fields are edited.
 - **In-Workspace Modal**: Re-review and re-generate existing campaigns at any time via the workspace header.
 
@@ -122,8 +124,10 @@ flowchart TD
 ### 5. Agnes AI Integration for Content Writing & Architectural Imagery
 - **Agnes AI Content Writing (`agnes-3.0-flash`)**: SOTA ultra-fast creative copywriting, positioning headlines, narrative hooks, and negative-space-aware photographic prompt engineering.
 - **Agnes AI Image Engine (`agnes-image-2.1-flash`)**: High-resolution photorealistic architectural and luxury real-estate image engine.
-- **Intelligent Prompt Engineering**: [`src/lib/creative/image-prompt-writer.ts`](file:///src/lib/creative/image-prompt-writer.ts) adds negative prompt constraints (zero overlaid text, clean skies, realistic textures, natural lighting).
-- **Graceful Fallbacks**: Automatic fallback to OpenRouter text models (`openai/gpt-4o-mini`, `openrouter/free`) and FLUX.1 (`FLUX.1-schnell:free` / `FLUX.1-dev:free`).
+- **Reviewed Prompt Priority**: A user-approved visual prompt bypasses AI prompt rewriting and is passed directly to the image provider. Any property website URL not already present is appended only as supplemental context.
+- **Campaign-Specific Architecture**: When no user-approved visual prompt is provided, the prompt writer adds a deterministic architectural variation based on the campaign ID. This guides—but cannot guarantee—a visually unique result.
+- **Provider Fallbacks & Visibility**: Image generation tries configured providers and may fall back to Pollinations FLUX. The actual returned model is stored on the asset and shown in the campaign workspace. Failed generation does not silently reuse uploaded photos.
+- **Sky-Blue Default Scrim**: New creatives use the sky-blue `#3492c9` scrim by default; saved custom scrim settings remain unchanged.
 
 ### 6. Database Storage & Network Egress Optimization
 - **In-Memory LRU Caching**: Added high-efficiency cache layer ([`src/lib/cache.ts`](file:///src/lib/cache.ts)) for frequent database queries (`brand:settings`, `dashboard:stats`, `properties:list`), drastically reducing Neon compute hours (CU-hrs) and network transfer egress.
@@ -375,7 +379,9 @@ docker run -d \
 - **Agnes AI (`agnes-image-2.1-flash`)**: High-resolution photorealistic architectural imagery, exterior perspective, interior lighting, and structural materials.
 - **Agnes AI Fast Alternative**: `agnes-image-2.5-flash`.
 - **FLUX.1 (`black-forest-labs/FLUX.1-schnell:free`)**: High-performance open-weights photorealism.
-- **Strict Negative Prompting**: Ensured by [`src/lib/creative/image-prompt-writer.ts`](file:///src/lib/creative/image-prompt-writer.ts) to guarantee raw imagery is generated completely free of distorted text overlays, watermarks, or clutter.
+- **Reviewed Prompt Priority**: Approved prompts go directly to the image provider without appended automatic constraints. For prompts not reviewed by a user, the prompt writer can add composition and campaign-specific architecture guidance.
+- **Provider Fallbacks**: The image provider can fall back from Agnes AI or the configured secondary API to Pollinations FLUX. Check the model recorded for an asset in the campaign workspace to see which provider returned it.
+- **Sky-Blue Default Scrim**: New creatives use `#3492c9` for the top image scrim. Existing saved custom scrim values are preserved.
 
 ---
 

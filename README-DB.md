@@ -83,6 +83,8 @@ To reduce compute hours (CU-hrs), keep database sizes compact, and minimize clou
 | `generations` | Activity & telemetry | `id` (UUID PK), `kind`, `model`, `duration`, `costCents`, `status`, `createdAt` |
 | `settings` | App & brand configurations | `key` (Text PK), `value` (JSONB) — includes `brand`, `template_library`, and `campaign-model` settings |
 
+Generated image asset payloads can include `imageGenPrompt` (the exact prompt sent to image generation), `imageGenModel` (the provider model that returned the image), `imageQualityScore`, and `imageSource`. These values are stored inside the existing `assets.payload` JSONB field; they do not require schema migrations.
+
 ---
 
 ## 5. Migration & Maintenance Commands

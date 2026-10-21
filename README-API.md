@@ -165,7 +165,7 @@ Proxies external images through the server with `Access-Control-Allow-Origin: *`
 ### 4. Content Review & Generation Pipeline
 
 #### `POST /api/campaigns/{id}/prepare-content`
-**Stage 3 Content Review**: Generates draft ad copy and a photorealistic visual prompt for user review before generating final creatives.
+**Stage 3 Content Review**: Generates draft ad copy and a visual prompt for user review before generating final creatives. The reviewed `imagePrompt` is included in the content object.
 
 **Request:**
 ```json
@@ -203,7 +203,9 @@ Proxies external images through the server with `Access-Control-Allow-Origin: *`
 ```
 
 #### `POST /api/campaigns/{id}/generate`
-Executes final asset generation. If `approvedContent` is provided, the engine strictly uses the user-approved copy and visual prompt to generate the Agnes AI imagery and typography layouts.
+Executes final asset generation. If `approvedContent.imagePrompt` is non-empty, that reviewed prompt is sent directly to the image provider; the prompt-writing model and automatic campaign-variation/composition additions are bypassed. If the property has a reference website URL that is not already in the reviewed prompt, it is appended as supplemental context. Other approved content supplies the overlaid ad copy and design settings. Without a reviewed image prompt, the prompt writer creates prompts with campaign-specific architectural guidance. If image generation fails, the endpoint returns an error rather than silently substituting an uploaded property photograph.
+
+Image provider fallback may still occur within the image provider itself (Agnes AI → configured secondary image API → Pollinations FLUX). The actual model returned is saved as `payload.imageGenModel` for generated assets.
 
 **Request:**
 ```json
@@ -227,15 +229,17 @@ Executes final asset generation. If `approvedContent` is provided, the engine st
 ```json
 {
   "ok": true,
-  "campaignId": "f7d3a012-4567-890a-bcde-f1234567890a",
-  "generated": 8,
-  "telemetry": {
-    "durationMs": 4200,
-    "model": "agnes-image-2.1-flash",
-    "costCents": 3
-  }
+  "count": 8,
+  "model": "approved-content",
+  "requestedModel": "resolved-text-model",
+  "fallback": false,
+  "videoOutput": "storyboard-script",
+  "imagePipeline": "ai-generated",
+  "imageModel": "agnes-image-2.1-flash"
 }
 ```
+
+`imageModel` reports the provider model returned for the generated images (or a comma-separated list if multiple models returned assets). Each generated visual asset stores `imageGenPrompt`, `imageGenModel`, and `imageQualityScore` in its payload. A generation failure returns HTTP 500 with `{ "error": "Generation failed." }`.
 
 ---
 

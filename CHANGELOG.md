@@ -4,6 +4,20 @@ Notable changes to M & A Creative Arena are recorded here in chronological order
 
 ---
 
+## [Unreleased] - 2026-10-21
+
+### Changed
+- **Approved Image Prompt Has Priority**: The image prompt edited and approved during review is passed directly to the image provider. Automatic prompt rewriting and appended composition/architecture guidance are skipped for approved prompts.
+- **Campaign-Specific Architecture Guidance**: Prompts without a user-approved visual directive receive deterministic campaign-specific massing, facade, balcony, and roofline guidance. This encourages variation but does not guarantee unique generated images.
+- **No Silent Uploaded-Photo Substitution**: Campaign image-generation failures now surface as errors rather than silently using the same uploaded exterior photograph.
+- **Sky-Blue Default Image Scrim**: New creatives use `#3492c9` as the default scrim color; existing saved custom settings are retained.
+
+### Added
+- **Actual Image Provider Visibility**: Generated assets store the image model that returned them, and the campaign workspace displays that model with the saved generation prompt and quality score.
+- **Wide Creative Layering Improvements**: Improved wide-format image scrim layering and added the location line to the wide layout.
+
+---
+
 ## [1.5.0] - 2026-10-10
 
 ### Added

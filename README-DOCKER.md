@@ -128,6 +128,11 @@ docker run -d \
 | `AGNES_MODEL` | `agnes-image-2.1-flash` | Agnes AI image model variant. |
 | `OPENROUTER_API_KEY` | *None* | Key for OpenRouter fallback copywriting & prompt intelligence. |
 | `OPENROUTER_MODEL` | `agnes-3.0-flash` | Text generation model slug. |
+| `IMAGE_API_KEY` | *None* | Optional key for the secondary image-generation API; OpenRouter key may be used when supported. |
+| `IMAGE_API_BASE_URL` | `https://openrouter.ai/api/v1` | Optional secondary image API base URL. |
+| `IMAGE_MODEL` | `black-forest-labs/FLUX.1-schnell:free` | Optional secondary image model slug. Agnes AI is tried first when its key is configured; provider fallback may use Pollinations FLUX. |
+
+When campaign content is approved, its edited image prompt is sent directly to the image provider without prompt rewriting. A property reference URL may be appended only if it is missing from the approved prompt. Generated assets record the actual provider model in their payload. Image-generation errors are returned instead of silently reusing uploaded property photos. New creatives use the sky-blue `#3492c9` scrim unless a saved/custom scrim setting overrides it.
 
 ---
 

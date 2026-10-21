@@ -59,7 +59,15 @@ flowchart LR
   - `DATABASE_URL`: Pooled connection string from Neon PostgreSQL.
   - `OPENROUTER_API_KEY`: API key for copy and prompt intelligence.
   - `AGNES_API_KEY`: API key for photorealistic architectural imagery.
+  - Optional `IMAGE_API_KEY`, `IMAGE_API_BASE_URL`, and `IMAGE_MODEL`: secondary image provider configuration. The image provider may fall back to Pollinations FLUX.
   - `NETLIFY_SKIP_SECRET_SCAN=true`: Recommended to prevent false-positive secret blocking on build.
+
+### Image Generation Operations
+- A non-empty prompt approved at review is sent directly to the image provider; automatic prompt rewriting and added composition/architecture constraints are bypassed for that prompt. A missing property reference URL may be appended as supplemental context.
+- Without a reviewed prompt, the prompt writer adds a campaign-specific architectural variation. This is guidance, not a guarantee that an image model will produce a unique building.
+- The actual provider model returned is persisted per generated asset as `payload.imageGenModel` and displayed in the campaign workspace.
+- Generation errors do not silently substitute an uploaded property photograph.
+- New creatives default to a sky-blue `#3492c9` image scrim. Existing saved/custom scrim settings are preserved.
 
 ---
 
