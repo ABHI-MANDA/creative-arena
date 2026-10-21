@@ -322,6 +322,7 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
   );
   const { developer, project } = parseDeveloperAndProject(p.kicker, p.headline, brand.name);
   const bhk = parseBhk(p.subline, p.kicker);
+  const location = p.locationLabel?.toUpperCase() ?? "";
   const tagline = p.fine?.toUpperCase() ?? "";
   const contactText = p.cta?.toUpperCase() ?? "";
   const price = p.priceLine ?? "";
@@ -333,24 +334,25 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
     : "";
 
   return (
-    <div className={cx("absolute inset-0 flex", p.designStyle === "minimal" && "text-left")} suppressHydrationWarning>
-      <div
-        className="flex h-full flex-col justify-between"
-        style={{
-          width: style.layout.widePanelWidth,
-          padding: style.layout.widePanelPadding,
-          backgroundImage: p.designStyle === "bold" ? `linear-gradient(160deg, ${accent}66, ${dark})` : `linear-gradient(160deg, ${dark}, ${style.colors.background})`,
-          borderRight: `1px solid ${accent}3d`,
-        }}
-      >
-        <div className="flex flex-col">
+    <div className={cx("absolute inset-0", p.designStyle === "minimal" && "text-left")} suppressHydrationWarning>
+      <div className="absolute inset-0 flex">
+        <div
+          className="relative flex h-full flex-col justify-between"
+          style={{
+            width: style.layout.widePanelWidth,
+            padding: style.layout.widePanelPadding,
+            backgroundImage: p.designStyle === "bold" ? `linear-gradient(160deg, ${accent}66, ${dark})` : `linear-gradient(160deg, ${dark}, ${style.colors.background})`,
+            borderRight: `1px solid ${accent}3d`,
+          }}
+        >
+          <div className="relative z-20 flex flex-col">
           {/* Developer / Brand */}
           <div
             className="font-sans font-bold tracking-[0.18em] text-white/90"
             style={{ fontSize: scaledFontSize(p, "developer", 9, 1.8, 18), color: textColor(p, "developer", style.colors.text) }}
           >
             {developer}
-          </div>
+            </div>
 
           {/* Project Title */}
           <h2
@@ -377,6 +379,13 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
             style={{ fontSize: scaledFontSize(p, "bhk", 18, 4.2, 42), color: textColor(p, "bhk", style.colors.text) }}
           >
             {bhk}
+          </div>}
+
+          {location && <div
+            className="font-sans font-medium tracking-[0.08em] text-white/85 mt-[0.5cqw]"
+            style={{ fontSize: scaledFontSize(p, "location", 7, 1.3, 13), color: textColor(p, "location", style.colors.mutedText) }}
+          >
+            {location}
           </div>}
 
           {/* Amenities Line */}
@@ -407,10 +416,10 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
         </div>
 
         {/* Bottom Contact Call Bar */}
-        {contactText && (
-          <div
-            className="w-full text-center font-sans font-bold text-[#0c120e] mt-auto"
-            style={{
+          {contactText && (
+            <div
+              className="relative z-20 w-full text-center font-sans font-bold text-[#0c120e] mt-auto"
+              style={{
               background: contrastingTextBackground(textColor(p, "cta", style.colors.ctaForeground)),
               color: textColor(p, "cta", style.colors.ctaForeground),
               padding: "1.2cqw 1.6cqw",
@@ -420,14 +429,14 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
               boxShadow: "0 2px 12px rgba(0,0,0,.35)",
               borderTop: p.designStyle === "bold" ? `0.55cqw solid ${accent}` : undefined,
               overflowWrap: "anywhere",
-            }}
-          >
-            {contactText}
-          </div>
-        )}
-      </div>
+              }}
+            >
+              {contactText}
+            </div>
+          )}
+        </div>
 
-      <div className="relative h-full flex-1">
+      <div className="relative z-0 h-full flex-1">
         {p.image && (
           <img
             src={p.image}
@@ -435,14 +444,15 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
             loading="lazy"
             decoding="async"
             className="ad-img"
-            style={{ filter: style.image.filter, transform: `scale(${style.image.scale})` }}
+            style={{ filter: style.image.filter, transform: `scale(${style.image.scale})`, zIndex: 0 }}
           />
         )}
-        <div
-          className="ad-wide-scrim"
-          style={{ backgroundImage: photoScrim }}
-        />
       </div>
+    </div>
+    <div
+      className="ad-wide-scrim absolute inset-0 z-10"
+      style={{ backgroundImage: photoScrim, pointerEvents: "none" }}
+    />
     </div>
   );
 }

@@ -89,7 +89,14 @@ export function syncGeneratedImageGradient(
     category: "shape",
     aiGenerated: true,
   };
-  canvas.insertAt(Math.min(1, canvas.getObjects().length), scrim);
+  const panelIndex = layout === "wide"
+    ? canvas.getObjects().findIndex((item) => {
+        const meta = (item as unknown as { meta?: ObjectMeta }).meta;
+        return meta?.id === "wide-panel-card";
+      })
+    : -1;
+  const insertIndex = panelIndex >= 0 ? panelIndex + 1 : 1;
+  canvas.insertAt(Math.min(insertIndex, canvas.getObjects().length), scrim);
 }
 
 function fontScale(payload: AssetPayload, section: AdTextSection): number {
@@ -804,14 +811,6 @@ export function populateDefaultFabricObjects(
     ? payload.layout === "wide"
     : ["linkedin", "portal"].includes(platform) || aspect === "16:9";
 
-  syncGeneratedImageGradient(
-    canvas,
-    isWide ? "wide" : "poster",
-    width,
-    height,
-    payload.scrimSettings ?? DEFAULT_SCRIM_SETTINGS
-  );
-
   if (isWide) {
     const panelWidth = Math.round(width * (parseFloat(style.layout.widePanelWidth) / 100));
     const leftMargin = 50;
@@ -840,6 +839,13 @@ export function populateDefaultFabricObjects(
       aiGenerated: true,
     };
     canvas.add(panelCard);
+    syncGeneratedImageGradient(
+      canvas,
+      "wide",
+      width,
+      height,
+      payload.scrimSettings ?? DEFAULT_SCRIM_SETTINGS
+    );
 
     let currentTop = 60;
 
@@ -897,21 +903,24 @@ export function populateDefaultFabricObjects(
       currentTop += calcTextHeight(payload.headline, headlineFontSize, contentWidth) + 15;
     }
 
-    // 4. Subline
-    if (payload.subline) {
-      const sublineFontSize = scaledFontSize(payload, "location", 22);
-      const subline = new fabric.Textbox(payload.subline, {
+    const bhk = parseBhk(payload.subline, payload.kicker);
+    const locationText = payload.locationLabel
+      ?? payload.subline?.replace(/\b\d+(?:\s*[,/&]\s*\d+)*\s*BHK\b/i, "").replace(/^[\s·,-]+|[\s·,-]+$/g, "").trim();
+
+    if (bhk) {
+      const bhkFontSize = scaledFontSize(payload, "bhk", 22);
+      const bhkText = new fabric.Textbox(bhk, {
         left: leftMargin,
         top: currentTop,
         width: contentWidth,
-        fontSize: sublineFontSize,
+        fontSize: bhkFontSize,
         fontFamily: "Inter, sans-serif",
-        fontWeight: "normal",
-        fill: fontColor(payload, "location", style.colors.mutedText),
+        fontWeight: "bold",
+        fill: fontColor(payload, "bhk", style.colors.text),
       });
-      (subline as unknown as { meta: ObjectMeta }).meta = {
-        id: "text-subline",
-        name: "Subline",
+      (bhkText as unknown as { meta: ObjectMeta }).meta = {
+        id: "text-bhk",
+        name: "Configuration (BHK)",
         editable: true,
         locked: false,
         deletable: true,
@@ -919,8 +928,33 @@ export function populateDefaultFabricObjects(
         category: "text",
         aiGenerated: true,
       };
-      canvas.add(subline);
-      currentTop += calcTextHeight(payload.subline, sublineFontSize, contentWidth) + 15;
+      canvas.add(bhkText);
+      currentTop += calcTextHeight(bhk, bhkFontSize, contentWidth) + 10;
+    }
+
+    if (locationText) {
+      const locationFontSize = scaledFontSize(payload, "location", 22);
+      const location = new fabric.Textbox(locationText, {
+        left: leftMargin,
+        top: currentTop,
+        width: contentWidth,
+        fontSize: locationFontSize,
+        fontFamily: "Inter, sans-serif",
+        fontWeight: "normal",
+        fill: fontColor(payload, "location", style.colors.mutedText),
+      });
+      (location as unknown as { meta: ObjectMeta }).meta = {
+        id: "text-location",
+        name: "Location",
+        editable: true,
+        locked: false,
+        deletable: true,
+        visible: true,
+        category: "text",
+        aiGenerated: true,
+      };
+      canvas.add(location);
+      currentTop += calcTextHeight(locationText, locationFontSize, contentWidth) + 15;
     }
 
     // 5. Bullets
@@ -1054,6 +1088,13 @@ export function populateDefaultFabricObjects(
   }
 
   // All poster ads use the luxury real-estate layout matching reference design
+  syncGeneratedImageGradient(
+    canvas,
+    "poster",
+    width,
+    height,
+    payload.scrimSettings ?? DEFAULT_SCRIM_SETTINGS
+  );
   populatePosterObjects(canvas, payload, brand, width, height);
   return;
 }
