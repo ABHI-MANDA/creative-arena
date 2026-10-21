@@ -4,6 +4,7 @@ import { db, isLocalJsonDb } from "@/db";
 import { assets, campaigns } from "@/db/schema";
 import { updateLocalDatabase } from "@/db/local-json";
 import {
+  analyzeDNA,
   composeAssets,
   directionsFor,
   hx,
@@ -14,7 +15,13 @@ import {
   type Img,
   type NewAsset,
 } from "@/lib/creative/engine";
-import { PLATFORM_KINDS, platformById, type BrandSettings } from "@/lib/creative/presets";
+import {
+  AD_TEXT_SECTIONS,
+  PLATFORM_KINDS,
+  platformById,
+  type AdTextSection,
+  type BrandSettings,
+} from "@/lib/creative/presets";
 import { DEFAULT_TEMPLATE_LIBRARY, TEMPLATE_LIBRARY_KEY, type TemplateLibrary } from "@/lib/creative/template-library";
 import { isFreeOpenRouterModel, resolveOpenRouterModel } from "@/lib/creative/models";
 import { generateAdImage, aspectToSize } from "@/lib/creative/image-provider";
@@ -24,10 +31,25 @@ import { invalidateCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
+function resolveTypographyValues<T extends string | number>(
+  requested: Partial<Record<AdTextSection, T>> | undefined,
+  prepared: Partial<Record<AdTextSection, T>> | undefined,
+  defaults: Record<AdTextSection, T>
+): Record<AdTextSection, T> {
+  const resolved = { ...defaults };
+  for (const { key } of AD_TEXT_SECTIONS) {
+    const value = requested?.[key];
+    if (value !== undefined && value !== prepared?.[key]) {
+      resolved[key] = value;
+    }
+  }
+  return resolved;
+}
+
 /* ------------------------------------------------------------------ */
 /* AI Image Pipeline                                                    */
-/* Attempts: LLM prompt writing → FLUX image generation → compose      */
-/* Returns null on any failure so the caller can fall back.            */
+/* Attempts: LLM prompt writing → image generation → compose           */
+/* Never substitutes an existing property photo for a failed generation. */
 /* ------------------------------------------------------------------ */
 async function tryAIImagePipeline({
   brief,
@@ -36,12 +58,13 @@ async function tryAIImagePipeline({
   brand,
   platformIds,
   presetId,
-  uploadedImages,
   thresholds,
   override,
   approvedContent,
   enabledKinds,
   requestedModel,
+  referenceWebsite,
+  campaignId,
 }: {
   brief: Brief;
   dna: NonNullable<
@@ -52,16 +75,21 @@ async function tryAIImagePipeline({
   brand: BrandSettings;
   platformIds: string[];
   presetId: string;
-  uploadedImages: Img[];
   thresholds: { ready: number; review: number };
   override: Parameters<typeof composeAssets>[0]["override"];
   approvedContent?: ApprovedAdContent | null;
   enabledKinds: string[] | undefined;
   requestedModel: string | null;
-}): Promise<NewAsset[] | null> {
+  referenceWebsite?: string;
+  campaignId: string;
+}): Promise<NewAsset[]> {
   try {
-    const visualKindsFor = (platform: string) =>
-      [...new Set(PLATFORM_KINDS[platform] ?? ["hero"])].filter((kind) => kind !== "reel" && kind !== "copy");
+    const visualKindsFor = (platform: string) => {
+      const kinds = [...new Set(PLATFORM_KINDS[platform] ?? ["hero"])].filter(
+        (kind) => kind !== "reel" && kind !== "copy"
+      );
+      return kinds.length ? kinds : ["hero"];
+    };
     const KIND_LABELS_MAP: Record<string, string[]> = {
       hero:      ["Exterior"],
       feature:   ["Living", "Kitchen", "Interior", "Clubhouse"],
@@ -74,8 +102,6 @@ async function tryAIImagePipeline({
 
     const platformResults = await Promise.allSettled(platformIds.map(async (platform) => {
       const visualKinds = visualKindsFor(platform);
-      if (visualKinds.length === 0) return { assets: [] as NewAsset[], generated: 0 };
-
       const platformSpec = platformById(platform);
       const promptContext: ImagePromptContext = {
         brandName: brand.name,
@@ -85,6 +111,8 @@ async function tryAIImagePipeline({
         aspectRatio: platformSpec.aspect,
         platform: platformSpec.label,
         approvedImagePrompt: approvedContent?.imagePrompt?.trim(),
+        referenceWebsite,
+        campaignId,
       };
       console.log(`[ai-pipeline] Writing ${platformSpec.aspect} prompts for kinds:`, visualKinds);
       const { prompts, model: promptModel, fallback: promptFallback } = await writeImagePrompts(
@@ -106,16 +134,20 @@ async function tryAIImagePipeline({
         }))
       );
       const aiImages: Img[] = [];
-      const qualityByKind: Record<string, { score: number; prompt: string }> = {};
+      const qualityByKind: Record<string, { score: number; prompt: string; model: string }> = {};
       for (const [index, result] of imageResults.entries()) {
         if (result.status === "rejected") {
           console.warn(`[ai-pipeline] Image generation failed for '${imageEntries[index]?.[0]}' at ${platformSpec.aspect}:`, result.reason);
           continue;
         }
         const { kind, prompt, img } = result.value;
-        qualityByKind[kind] = { score: img.qualityScore, prompt };
+        qualityByKind[kind] = { score: img.qualityScore, prompt, model: img.model };
         for (const label of KIND_LABELS_MAP[kind] ?? ["Exterior"]) aiImages.push({ url: img.url, label });
         console.log(`[ai-pipeline] Generated '${kind}' for ${platformSpec.aspect}: QC=${img.qualityScore} in ${img.durationMs}ms`);
+      }
+
+      if (imageResults.some((result) => result.status === "rejected")) {
+        throw new Error(`Image generation failed for one or more ${platformSpec.aspect} ad formats.`);
       }
 
       const composed = composeAssets({
@@ -124,7 +156,7 @@ async function tryAIImagePipeline({
         presetId,
         platformIds: [platform],
         direction,
-        images: [...aiImages, ...uploadedImages],
+        images: aiImages,
         thresholds,
         override,
         approvedContent,
@@ -135,14 +167,18 @@ async function tryAIImagePipeline({
       return {
         generated: aiImages.length,
         assets: composed.map((asset) => {
-          const quality = qualityByKind[asset.kind];
+          const quality = qualityByKind[asset.kind] ?? (asset.kind === "reel" ? qualityByKind.hero : undefined);
+          if (asset.kind !== "copy" && !quality) {
+            throw new Error(`No campaign-specific image was generated for '${asset.kind}' at ${platformSpec.aspect}.`);
+          }
           return {
             ...asset,
             payload: {
               ...asset.payload,
-              imageSource: (quality ? "ai-generated" : uploadedImages.length ? "uploaded" : "sample") as "ai-generated" | "uploaded" | "sample",
-              imageGenPrompt: quality?.prompt ?? approvedContent?.imagePrompt,
-              imageQualityScore: quality?.score ?? asset.score,
+              imageSource: "ai-generated" as const,
+              imageGenPrompt: quality?.prompt,
+              imageGenModel: quality?.model,
+              imageQualityScore: quality?.score,
             },
           };
         }),
@@ -156,33 +192,11 @@ async function tryAIImagePipeline({
         generatedCount += result.value.generated;
         assetsByPlatform.push(...result.value.assets.filter((asset) => asset.kind !== "copy"));
       } else {
-        const platform = platformIds[index];
-        console.warn(`[ai-pipeline] Falling back to supplied images for ${platform}:`, result.reason);
-        assetsByPlatform.push(...composeAssets({
-          brief,
-          dna: dna as Parameters<typeof composeAssets>[0]["dna"],
-          presetId,
-          platformIds: [platform],
-          direction,
-          images: uploadedImages,
-          thresholds,
-          override,
-          approvedContent,
-          typographyDefaults: brand.typographyDefaults,
-          enabledKinds,
-        }).filter((asset) => asset.kind !== "copy").map((asset) => ({
-          ...asset,
-          payload: {
-            ...asset.payload,
-            imageSource: (uploadedImages.length ? "uploaded" : "sample") as "uploaded" | "sample",
-            imagePrompt: approvedContent?.imagePrompt,
-          },
-        })));
+        throw new Error(`Image generation failed for platform '${platformIds[index]}'.`, { cause: result.reason });
       }
     }
     if (generatedCount === 0) {
-      console.warn("[ai-pipeline] No format-specific image generated — using the existing composition path.");
-      return null;
+      throw new Error("No campaign-specific images were generated; refusing to substitute existing property photos.");
     }
     const copyPack = composeAssets({
       brief,
@@ -190,7 +204,7 @@ async function tryAIImagePipeline({
       presetId,
       platformIds,
       direction,
-      images: uploadedImages,
+      images: [],
       thresholds,
       override,
       approvedContent,
@@ -200,8 +214,8 @@ async function tryAIImagePipeline({
     if (copyPack) assetsByPlatform.push(copyPack);
     return assetsByPlatform;
   } catch (error) {
-    console.error("[ai-pipeline] Pipeline threw an unhandled error — falling back:", error);
-    return null;
+    console.error("[ai-pipeline] Campaign-specific image generation failed:", error);
+    throw error;
   }
 }
 
@@ -232,9 +246,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       description: p.description,
     };
 
+    const liveDna = analyzeDNA(brief);
+    const dna = bundle.dna
+      ? { ...bundle.dna, architecture: liveDna.architecture, palette: liveDna.palette, paletteHex: liveDna.paletteHex }
+      : liveDna;
+
     const options = bundle.campaign.options?.length
       ? bundle.campaign.options
-      : directionsFor(bundle.dna as Parameters<typeof directionsFor>[0], brief);
+      : directionsFor(dna as Parameters<typeof directionsFor>[0], brief);
     const direction = options.find((o) => o.id === body.directionId) ?? options[0];
 
     const started = Date.now();
@@ -250,9 +269,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .map((template) => `${template.kind}: ${template.name}. ${template.instructions}`)
       .join("\n");
 
-    const approvedContent =
-      body.approvedContent ??
-      (await getAppSetting<ApprovedAdContent | null>(`campaign-draft-content:${id}`, null));
+    const preparedContent = await getAppSetting<ApprovedAdContent | null>(
+      `campaign-draft-content:${id}`,
+      null
+    );
+    const submittedContent = body.approvedContent ?? preparedContent;
+    const approvedContent = submittedContent
+      ? {
+          ...submittedContent,
+          fontSizes: resolveTypographyValues(
+            submittedContent.fontSizes,
+            preparedContent?.fontSizes,
+            brand.typographyDefaults.fontSizes
+          ),
+          fontColors: resolveTypographyValues(
+            submittedContent.fontColors,
+            preparedContent?.fontColors,
+            brand.typographyDefaults.fontColors
+          ),
+        }
+      : null;
     if (approvedContent) {
       await setAppSetting(`campaign-approved-content:${id}`, approvedContent);
     }
@@ -265,7 +301,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!approvedContent) {
       const llmResult = await tryLLMOverride(
         brief,
-        bundle.dna as Parameters<typeof tryLLMOverride>[1],
+        dna as Parameters<typeof tryLLMOverride>[1],
         bundle.campaign.preset,
         requestedModel,
         templateInstructions,
@@ -278,68 +314,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await setAppSetting(`campaign-model:${id}`, model);
     }
 
-    const uploadedImages = bundle.images.map((i) => ({ url: i.url, label: i.label }));
     const platformIds = bundle.campaign.platforms ?? [];
 
     /* ---- AI Image Pipeline (Agnes AI / OpenRouter / FLUX) ---- */
-    const imageApiKey =
-      process.env.AGNES_API_KEY?.trim() ||
-      process.env.IMAGE_API_KEY?.trim() ||
-      process.env.OPENROUTER_API_KEY?.trim();
     const imageModel =
       process.env.AGNES_MODEL?.trim().toLowerCase() ||
       process.env.IMAGE_MODEL?.trim().toLowerCase() ||
       (process.env.AGNES_API_KEY?.trim() ? "agnes-image-2.1-flash" : "black-forest-labs/FLUX.1-schnell:free");
-    let composed: NewAsset[] | null = null;
-    let usedAIPipeline = false;
-
-    if (imageApiKey && imageModel) {
-      console.log(`[generate] Attempting AI image pipeline with model: ${imageModel}`);
-      composed = await tryAIImagePipeline({
-        brief,
-        dna: bundle.dna as NonNullable<typeof bundle.dna>,
-        direction,
-        brand,
-        platformIds,
-        presetId: bundle.campaign.preset,
-        uploadedImages,
-        thresholds: brand.thresholds,
-        override,
-        approvedContent,
-        enabledKinds,
-        requestedModel,
-      });
-      if (composed) {
-        usedAIPipeline = true;
-        console.log(`[generate] AI image pipeline succeeded: ${composed.length} assets`);
-      } else {
-        console.warn("[generate] AI image pipeline returned null — using existing approach.");
-      }
-    } else {
-      console.log("[generate] No image API key or model configured — skipping AI image pipeline.");
-    }
-
-    /* ---- FALLBACK: existing deterministic approach ---- */
-    if (!composed) {
-      composed = composeAssets({
-        brief,
-        dna: bundle.dna as Parameters<typeof composeAssets>[0]["dna"],
-        presetId: bundle.campaign.preset,
-        platformIds,
-        direction,
-        images: uploadedImages,
-        thresholds: brand.thresholds,
-        override,
-        approvedContent,
-        typographyDefaults: brand.typographyDefaults,
-        enabledKinds,
-      });
-      // Tag as uploaded source
-      composed = composed.map((asset) => ({
-        ...asset,
-        payload: { ...asset.payload, imageSource: "uploaded" as const },
-      }));
-    }
+    console.log(`[generate] Generating campaign-specific architecture with configured model: ${imageModel}`);
+    const composed = await tryAIImagePipeline({
+      brief,
+      dna: bundle.dna as NonNullable<typeof bundle.dna>,
+      direction,
+      brand,
+      platformIds,
+      presetId: bundle.campaign.preset,
+      thresholds: brand.thresholds,
+      override,
+      approvedContent,
+      enabledKinds,
+      requestedModel,
+      referenceWebsite: p.sourceUrl,
+      campaignId: id,
+    });
 
     /* ---- Persist assets (unchanged logic) ---- */
     if (isLocalJsonDb) {
@@ -390,7 +387,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     /* ---- Log generation actions ---- */
     const elapsed = Date.now() - started;
     const hasReel = composed.some((a) => a.kind === "reel");
-    const visualModel = usedAIPipeline ? (imageModel ?? "agnes-image-2.1-flash") : "local-ad-layout-v1";
+    const visualModels = [...new Set(
+      composed.map((asset) => asset.payload.imageGenModel).filter((value): value is string => Boolean(value))
+    )];
+    const visualModel = visualModels.join(", ") || imageModel;
     await logGeneration({ kind: "visual", model: visualModel, durationMs: 1200 + (hx(id) % 2400), costCents: 0, campaignId: id, propertyId: p.id });
     await logGeneration({ kind: "compose", model, durationMs: Math.max(400, elapsed), costCents: 6, campaignId: id, propertyId: p.id });
     if (hasReel) await logGeneration({ kind: "video-script", model, durationMs: Math.max(400, elapsed), costCents: 0, campaignId: id, propertyId: p.id });
@@ -409,8 +409,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       requestedModel,
       fallback,
       videoOutput: "storyboard-script",
-      imagePipeline: usedAIPipeline ? "ai-generated" : "uploaded",
-      imageModel: usedAIPipeline ? imageModel : null,
+      imagePipeline: "ai-generated",
+      imageModel: visualModel,
     });
   } catch (e) {
     console.error(e);

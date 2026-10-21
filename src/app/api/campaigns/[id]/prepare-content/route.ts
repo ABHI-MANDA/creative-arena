@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCampaignBundle, getBrand, getAppSetting, setAppSetting } from "@/db/queries";
 import {
+  analyzeDNA,
   buildDraftAdContent,
   directionsFor,
   tryLLMOverride,
@@ -32,9 +33,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       description: p.description,
     };
 
+    const liveDna = analyzeDNA(brief);
+    const dna = bundle.dna
+      ? { ...bundle.dna, architecture: liveDna.architecture, palette: liveDna.palette, paletteHex: liveDna.paletteHex }
+      : liveDna;
+
     const options = bundle.campaign.options?.length
       ? bundle.campaign.options
-      : directionsFor(bundle.dna as Parameters<typeof directionsFor>[0], brief);
+      : directionsFor(dna as Parameters<typeof directionsFor>[0], brief);
     const direction = options.find((o) => o.id === body.directionId) ?? options[0];
 
     const selection = body.model ?? (await getAppSetting(`campaign-model:${id}`, "auto"));
@@ -58,7 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const { override, model } = await tryLLMOverride(
       brief,
-      bundle.dna as Parameters<typeof tryLLMOverride>[1],
+      dna as Parameters<typeof tryLLMOverride>[1],
       bundle.campaign.preset,
       requestedModel,
       templateInstructions,
@@ -69,7 +75,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const draftContent = buildDraftAdContent(
       brief,
-      bundle.dna as Parameters<typeof buildDraftAdContent>[1],
+      dna as Parameters<typeof buildDraftAdContent>[1],
       direction,
       override,
       brand?.name,

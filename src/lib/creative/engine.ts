@@ -95,6 +95,7 @@ export type AssetPayload = {
   /* ---- AI image pipeline fields ---- */
   imageSource?: "ai-generated" | "uploaded" | "sample";  // origin of the background image
   imageGenPrompt?: string;   // the exact prompt sent to the image model
+  imageGenModel?: string;    // provider model that returned the image
   imageQualityScore?: number; // quality score from the image generation evaluator (0-100)
   /* ---- Fabric.js Editor fields ---- */
   designJson?: Record<string, unknown> | string;
@@ -151,6 +152,143 @@ const cityOf = (location: string) => {
 
 /* ---------------- Creative DNA ---------------- */
 
+function extractArchitecturalDNA(brief: Brief): {
+  architecture: string;
+  palette: string[];
+  paletteHex: string[];
+} {
+  const text = `${brief.propertyType} ${brief.name} ${brief.description ?? ""} ${brief.amenities ?? ""}`.toLowerCase();
+
+  // Extract explicit structural details from description if present (e.g. "34-storey glass tower", "62 courtyard villas")
+  const desc = (brief.description ?? "").trim();
+  const explicitCues: string[] = [];
+  const heightMatch = desc.match(/\b(\d+[- ](?:storey|story|floor))\b/i);
+  if (heightMatch) explicitCues.push(heightMatch[1]);
+  if (/sky deck/i.test(desc)) explicitCues.push("sky deck");
+  if (/infinity pool/i.test(desc)) explicitCues.push("infinity pool");
+  if (/courtyard/i.test(desc)) explicitCues.push("central courtyards");
+  if (/curtain wall|glass facade/i.test(desc)) explicitCues.push("curtain-wall glazing");
+  if (/private garden/i.test(desc)) explicitCues.push("private landscaped gardens");
+  if (/terrace/i.test(desc)) explicitCues.push("cantilevered terraces");
+  if (/lake view|sea view|ocean view/i.test(desc)) explicitCues.push("panoramic water views");
+
+  // 1. Neoclassical / Classical Revival
+  if (/\b(neoclassical|classical|greco-roman|roman|greek|colonial|victorian|georgian|palladian|portico|fluted column|pediment|chateau|palatial)\b/i.test(text)) {
+    const extra = explicitCues.length ? `, incorporating ${explicitCues.join(", ")}` : "";
+    return {
+      architecture: `Neoclassical & Classical Revival with grand symmetry, fluted columns, ornate carved stonework, and stately porticos${extra}`,
+      palette: ["Parchment Stone", "Antique Bronze", "Carrara White"],
+      paletteHex: ["#E8E2D5", "#6B5B45", "#F7F5F0"],
+    };
+  }
+
+  // 2. Mediterranean / Spanish / Tuscan / Italian
+  if (/\b(mediterranean|spanish|tuscan|andalusian|terracotta|stucco|hacienda|clay tile|italian villa|colonnade|juliet balcon|pergola)\b/i.test(text)) {
+    const extra = explicitCues.length ? `, featuring ${explicitCues.join(", ")}` : "";
+    return {
+      architecture: `Mediterranean Spanish-Colonial with warm terracotta tile roofs, textured stucco walls, arched loggias, and internal courtyards${extra}`,
+      palette: ["Terracotta", "Warm Stucco", "Olive Stone"],
+      paletteHex: ["#C86D51", "#E6DFCE", "#5A614C"],
+    };
+  }
+
+  // 3. Biophilic / Vertical Forest / Eco-Luxury
+  if (/\b(biophilic|vertical forest|green wall|living wall|hanging garden|green balcon|terraced garden|sustainable|cascading|nature-infused|botanical)\b/i.test(text)) {
+    const extra = explicitCues.length ? `, featuring ${explicitCues.join(", ")}` : "";
+    return {
+      architecture: `Biophilic Sustainable Architecture with cascading landscaped terraces, living green walls, natural timber fins, and expansive glazing${extra}`,
+      palette: ["Forest Green", "Raw Teak", "Muted Limestone"],
+      paletteHex: ["#2E473B", "#8C6239", "#DDD8CD"],
+    };
+  }
+
+  // 4. Tropical Modern / Balinese / Courtyard Villa
+  if (/\b(tropical|balinese|courtyard|villa|bungalow|resort-style|plunge pool|verandah|teak|frangipani|shingle|overhang|bali)\b/i.test(text)) {
+    const extra = explicitCues.length ? `, featuring ${explicitCues.join(", ")}` : "";
+    return {
+      architecture: `Tropical Modern Pavilions with expansive timber overhangs, landscaped courtyards, natural stone water features, and louvered screens${extra}`,
+      palette: ["Teak Wood", "Lava Stone", "Bone White"],
+      paletteHex: ["#7A4E2D", "#333538", "#F5F2EB"],
+    };
+  }
+
+  // 5. Art Deco / Mid-Century Modern
+  if (/\b(art deco|deco|mid-century|brass accent|geometric facade|sunburst|stepped facade|ziggurat|streamline)\b/i.test(text)) {
+    const extra = explicitCues.length ? `, featuring ${explicitCues.join(", ")}` : "";
+    return {
+      architecture: `Art Deco Elegance with geometric relief facades, fluted brass detailing, stepped profile setbacks, and polished terrazzo${extra}`,
+      palette: ["Deep Emerald", "Gilded Brass", "Obsidian Black"],
+      paletteHex: ["#1E3B30", "#D4AF37", "#0F1113"],
+    };
+  }
+
+  // 6. Sculptural Concrete / Brutalist / Industrial
+  if (/\b(brutalist|exposed concrete|industrial|raw concrete|board-formed|steel frame|loft|monolithic|sculptural concrete)\b/i.test(text)) {
+    const extra = explicitCues.length ? `, featuring ${explicitCues.join(", ")}` : "";
+    return {
+      architecture: `Sculptural Modern Minimalism with board-formed architectural concrete, black steel framing, fluted oak, and rectilinear volumes${extra}`,
+      palette: ["Ash Concrete", "Matte Black Steel", "Natural Oak"],
+      paletteHex: ["#8E9094", "#1A1A1A", "#B89B72"],
+    };
+  }
+
+  // 7. Waterfront / Coastal / Nautical
+  if (/\b(waterfront|coastal|beachfront|sea-facing|ocean|lakeview|lakeside|marina|nautical)\b/i.test(text)) {
+    const extra = explicitCues.length ? `, featuring ${explicitCues.join(", ")}` : "";
+    return {
+      architecture: `Contemporary Coastal Living with aerodynamic glass balconies, nautical white architectural lines, and panoramic waterfront glazing${extra}`,
+      palette: ["Aquamarine", "Driftwood Sand", "Nautical White"],
+      paletteHex: ["#3E6B7D", "#D4C5B0", "#F8F9FA"],
+    };
+  }
+
+  // 8. High-Rise Contemporary Skyscraper / Glass Tower
+  if (/\b(skyscraper|high-rise|sky residence|storey|story|tower|sky deck|curtain wall|glass facade|double-glazed|panoramic sky)\b/i.test(text)) {
+    const extra = explicitCues.length ? `, featuring ${explicitCues.join(", ")}` : "";
+    return {
+      architecture: `Contemporary Aerodynamic High-Rise with floor-to-ceiling glass curtain walls, metallic champagne fins, and cantilevered sky balconies${extra}`,
+      palette: ["Reflective Glass", "Champagne Bronze", "Titanium Grey"],
+      paletteHex: ["#3B5266", "#C5A880", "#22252A"],
+    };
+  }
+
+  // 9. Master-planned Plotted Enclave / Land
+  if (/\b(plot|plotted|land|master-planned|avenue|gated layout)\b/i.test(text)) {
+    return {
+      architecture: "Master-Planned Eco-Enclave with paved tree-lined boulevards, bespoke entrance gates, landscaped parklands, and subterranean utilities",
+      palette: ["Emerald Lawn", "Paved Slate", "Warm Amber"],
+      paletteHex: ["#2D5A27", "#4A525A", "#C89D3C"],
+    };
+  }
+
+  // 10. Boutique Low-Rise / Mansions / Heritage Enclave
+  if (/\b(low-rise|boutique|mansion|heritage|manor|estate|enclave|brownstone|duplex|penthouse)\b/i.test(text)) {
+    const extra = explicitCues.length ? `, featuring ${explicitCues.join(", ")}` : "";
+    return {
+      architecture: `Boutique Low-Rise Manor with hand-dressed ashlar masonry, expansive bronze-framed windows, and private landscaped courtyards${extra}`,
+      palette: ["Limestone Cream", "Weathered Bronze", "Slate"],
+      paletteHex: ["#DFD7CA", "#6E5B4B", "#383C42"],
+    };
+  }
+
+  // Default fallback: infer from propertyType and description gracefully
+  const isVilla = /villa|row house|bungalow|estate/i.test(text);
+  if (isVilla) {
+    return {
+      architecture: "Modern Tropical Contemporary Villa with floor-to-ceiling sliding glass, warm teak accents, and lush garden integration",
+      palette: ["Alabaster", "Graphite", "Teak Wood"],
+      paletteHex: ["#EFE9DC", "#3B3A38", "#9C6B43"],
+    };
+  }
+
+  const extra = explicitCues.length ? `, featuring ${explicitCues.join(", ")}` : "";
+  return {
+    architecture: `Sophisticated Contemporary Residential Architecture with elegant geometric facade detailing, deep recessed balconies, and warm architectural lighting${extra}`,
+    palette: ["Bronze Glass", "Travertine", "Midnight"],
+    paletteHex: ["#B08B5E", "#D9D2C3", "#1D2330"],
+  };
+}
+
 export function analyzeDNA(brief: Brief): DNA {
   const t = `${brief.propertyType} ${brief.name}`.toLowerCase();
   const isVilla = /villa|row house|bungalow|estate/.test(t);
@@ -166,11 +304,7 @@ export function analyzeDNA(brief: Brief): DNA {
   const loc = brief.location || "Bengaluru";
   const city = cityOf(loc);
 
-  const architecture = isVilla
-    ? "Modern Tropical Contemporary"
-    : isPlot
-      ? "Master-planned Enclave"
-      : "Urban Modern Skyline";
+  const { architecture, palette, paletteHex } = extractArchitecturalDNA(brief);
 
   const positioning = isVilla
     ? `Villa residences in ${loc}`
@@ -181,10 +315,8 @@ export function analyzeDNA(brief: Brief): DNA {
 
   return {
     architecture,
-    palette: isVilla
-      ? ["Alabaster", "Graphite", "Teak Wood"]
-      : ["Bronze Glass", "Travertine", "Midnight"],
-    paletteHex: isVilla ? ["#EFE9DC", "#3B3A38", "#9C6B43"] : ["#B08B5E", "#D9D2C3", "#1D2330"],
+    palette,
+    paletteHex,
     lighting: pick(["Warm golden hour", "Dusk glow", "Soft morning haze"], lightingSeed % 3),
     audience: brief.audience?.trim() || (isVilla ? "Premium family buyers, 38–55" : "Young professionals & investors, 28–45"),
     positioning,
@@ -518,7 +650,7 @@ export async function tryLLMOverride(
                 "captions is an object with optional instagram, facebook, linkedin, whatsapp, portal, youtube strings.",
                 "hashtags is an array of up to 12 strings.",
                 "storyboard is an array of 5 to 8 objects with t, label, visual, line, tag; make total duration 15 seconds for Instagram Reels or 30 seconds for YouTube Shorts, use a clear hook, visual progression, factual proof, and CTA end-frame.",
-                "imagePrompt describes premium real-estate photography only: preserve plausible architecture and materials, anchor structures in lower-middle frame, maintain clean open sky negative space in upper 40% for typography overlays. Do not ask an image model to render text, logos, prices, or typography. There is no character or word limit on imagePrompt; write an unconstrained, richly detailed photographic brief.",
+                "imagePrompt must specifically capture the project's unique architectural identity, facade materials, structural styling, rooflines, and spatial character based on the property description and property type (e.g. Victorian, Mediterranean, Brutalist, Tropical Modern, Art Deco, Biophilic Green Terraces, Glass High-rise). Avoid generic building descriptions. Anchor structures in the lower-middle frame, maintaining clean open sky negative space in upper 35-40% for typography overlays. Do not ask an image model to render text, logos, prices, or typography. There is no character or word limit on imagePrompt; write an unconstrained, richly detailed photographic brief.",
                 templateInstructions ? `Active template direction (follow unless it conflicts with verified facts): ${templateInstructions}` : "",
               ].filter(Boolean).join(" "),
             },
@@ -835,9 +967,12 @@ export function buildDraftAdContent(
   const amenitiesLine = dna.usps.slice(0, 2).join(" | ").toUpperCase();
   const price = brief.price;
   const cta = presetCtas[presetId] || "Explore Residences";
+  const archDetail = dna.architecture;
+  const verifiedAmenities = dna.usps.length ? `featuring confirmed amenities: ${dna.usps.slice(0, 3).join(", ")}` : "";
+  const descContext = brief.description ? `Architectural cues: ${brief.description.slice(0, 160)}.` : "";
   const imagePrompt =
     override?.imagePrompt ||
-    `Create a photorealistic advertising background for ${brief.propertyType} at ${brief.name}, ${brief.location}. Match the verified architectural character (${dna.architecture}) and use only confirmed features (${dna.usps.join(", ") || "no specific amenities supplied"}). Follow the ${presetById(presetId).label} campaign objective (${presetById(presetId).objective}) and the ${direction.name} visual direction: ${direction.grade}. Reserve clear negative space for separately overlaid ad copy. No text, logos, prices, or invented property details.`;
+    `Photorealistic architectural photography of ${brief.name}, ${brief.propertyType} in ${brief.location}. Designed in ${archDetail}. ${descContext} ${verifiedAmenities}. Captured during ${dna.lighting.toLowerCase()} with ${direction.grade.toLowerCase()}, highlighting authentic structural lines, rich facade textures, and natural glass reflections. Building anchored in the lower 60% of the frame with clean, uncluttered open sky in the upper 40% reserved for headline typography. Premium architectural advertising standard, realistic environmental depth, strictly no text, no logos, no watermarks.`;
 
   return {
     developer: devAndProj.developer,

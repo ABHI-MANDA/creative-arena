@@ -24,6 +24,8 @@ export type ImagePromptContext = {
   aspectRatio?: string;
   platform?: string;
   approvedImagePrompt?: string;
+  referenceWebsite?: string;
+  campaignId?: string;
 };
 
 function aspectComposition(aspectRatio?: string): string {
@@ -43,15 +45,68 @@ function aspectComposition(aspectRatio?: string): string {
   }
 }
 
-function finishPrompt(prompt: string, aspectRatio?: string): string {
+function getReferenceWebsite(context?: ImagePromptContext): string | undefined {
+  const suppliedWebsite = context?.referenceWebsite?.trim();
+  if (suppliedWebsite) return suppliedWebsite;
+  return context?.approvedImagePrompt
+    ?.match(/https?:\/\/\S+/i)?.[0]
+    ?.replace(/[),.;!?]+$/, "");
+}
+
+function campaignArchitectureVariation(campaignId?: string): string | undefined {
+  if (!campaignId?.trim()) return undefined;
+  const key = campaignId.trim();
+  const hash = (value: string) => {
+    let result = 2166136261;
+    for (let index = 0; index < value.length; index++) {
+      result = Math.imul(result ^ value.charCodeAt(index), 16777619);
+    }
+    return result >>> 0;
+  };
+  const choose = (dimension: string, options: string[]) =>
+    options[hash(`${key}:${dimension}`) % options.length];
+
+  return [
+    `campaign design variation ${hash(key).toString(36)}`,
+    `building massing: ${choose("massing", ["stepped interlocking volumes", "slender tower with a sculpted podium", "paired wings around a central void", "offset vertical blocks with recessed terraces", "broad horizontal terraces rising to a compact crown"])}`,
+    `facade: ${choose("facade", ["deeply framed balcony bays", "alternating solid and glazed vertical fins", "layered screens with inset window bands", "projecting geometric frames around recessed glazing", "a regular structural grid with varied recessed panels"])}`,
+    `balconies: ${choose("balconies", ["stacked loggias with varied setbacks", "alternating cantilevered balcony boxes", "continuous planted terrace bands", "recessed corner balconies with solid side screens", "slim balconies integrated into deep facade frames"])}`,
+    `roofline: ${choose("roofline", ["a clean flat crown with a strong parapet", "a stepped crown with a recessed top-floor terrace", "a slim rooftop pergola profile", "a distinctive split-height roof silhouette"])}`,
+    "Design a genuinely new building form for this campaign; do not reproduce an uploaded exterior photo or reuse the same facade silhouette from another campaign. Keep the supplied property facts and requested material palette, but treat the architectural composition above as mandatory.",
+  ].join("; ");
+}
+
+function finishPrompt(
+  prompt: string,
+  aspectRatio?: string,
+  referenceWebsite?: string,
+  architectureVariation?: string
+): string {
   const constraints = [
     aspectRatio ? aspectComposition(aspectRatio) : "",
+    referenceWebsite
+      ? `Use this property reference website as visual context where supported, but do not render its URL or any website text: ${referenceWebsite}`
+      : "",
     "Do not render text, letters, numbers, logos, signs, watermarks, or graphic overlays; use even natural exposure across the full frame, preserve visible shadow detail, and avoid vignettes, dark fades, black gradients, or crushed blacks",
     "Use only the supplied property facts and plausible architecture",
     "photorealistic premium real-estate advertising photography",
+    architectureVariation,
   ].filter(Boolean).join("; ");
   const cleanPrompt = prompt.trim().replace(/[.;,\s]+$/, "");
   return `${cleanPrompt}; ${constraints}`;
+}
+
+function approvedPromptSet(kinds: string[], context: ImagePromptContext): ImagePromptSet {
+  const approvedPrompt = context.approvedImagePrompt?.trim();
+  if (!approvedPrompt) return {};
+
+  const referenceWebsite = getReferenceWebsite(context);
+  const supplementalReference = referenceWebsite && !approvedPrompt.includes(referenceWebsite)
+    ? `\n\nSupplemental property reference only; do not render this URL or let it override the user-approved prompt: ${referenceWebsite}`
+    : "";
+  const finalPrompt = `${approvedPrompt}${supplementalReference}`;
+
+  return Object.fromEntries(kinds.map((kind) => [kind, finalPrompt]));
 }
 
 /* Compositional negative-space guidance per ad format */
@@ -84,16 +139,22 @@ const DIRECTION_STYLE: Record<string, string> = {
 
 function systemPrompt(context?: ImagePromptContext): string {
   const preset = context?.campaignPreset ? presetById(context.campaignPreset) : null;
+  const hasApprovedPrompt = Boolean(context?.approvedImagePrompt?.trim());
   return [
     "You are an elite real-estate advertising art director and photography director.",
     "Write one technically precise, director-grade image-generation prompt for each requested ad format.",
     "CRITICAL ADVERTISING RULES:",
-    "1. FACTUAL ACCURACY: Match the supplied property type, location, architecture, materials, and confirmed features. Never add amenities, views, construction details, or other claims that are not in the brief.",
-    "2. COMPOSITION & SAFE ZONES: Follow the exact aspect-ratio composition instructions. Reserve clear, uncluttered negative space for the separately rendered ad copy; keep the property visible and undistorted.",
+    hasApprovedPrompt
+      ? "1. USER-REVIEWED VISUAL DIRECTIVE: Preserve the user's requested property facts, architectural character, material palette, and atmosphere from 'userReviewedVisualDirection', but do NOT lock or copy one exact facade. Follow the campaign-specific architecture variation supplied in the user data to create a visibly different building structure for each campaign."
+      : "1. ARCHITECTURAL AUTHENTICITY: Use the property's verified facts, but follow the campaign-specific architecture variation supplied in the user data. Create a visibly different building structure for each campaign instead of repeating a generic or previously used facade.",
+    "2. COMPOSITION & SAFE ZONES: Follow the exact aspect-ratio composition instructions. Reserve clear, uncluttered negative space (clean sky/ambient space in the upper 35-40%) for the separately rendered ad copy; keep the property visible and undistorted.",
     "3. BRAND AND CAMPAIGN FIT: Reflect the supplied company identity, campaign objective, selected creative direction, verified palette, and lighting without adding logos or text.",
     "4. CLEAN CANVAS: Never generate text, typography, words, numbers, logos, banners, watermarks, or UI elements.",
     "5. DENSITY & DETAIL: Comprehensive, unconstrained photographic brief with specific camera, lighting, material, composition, and color-grade direction without word or character count limits.",
     "6. OUTPUT: Return strictly one valid JSON object mapping each requested kind key to a prompt string. No markdown fences or explanation.",
+    "When a reference website URL is supplied, include it verbatim in each final image prompt as visual reference context; do not claim to have opened or inspected the website, and never render the URL as image text.",
+    "Create a distinct camera angle, framing, or photographic moment for each requested ad format while preserving the same verified property identity.",
+    "Treat campaignArchitectureVariation as a required design brief: change the building's massing, facade articulation, balcony geometry, and roofline for this campaign. Do not merely change camera angle, crop, or lighting to simulate a new design.",
     context?.brandName ? `Company: ${context.brandName}.` : "",
     context?.brandColor ? `Brand color accent: ${context.brandColor}.` : "",
     context?.brandTones?.length ? `Brand voice: ${context.brandTones.join(", ")}.` : "",
@@ -107,8 +168,11 @@ function userPrompt(brief: Brief, dna: DNA, direction: Direction, kinds: string[
   const dirStyle = DIRECTION_STYLE[direction.id] ?? DIRECTION_STYLE["golden-hour-cinema"];
   const palette = [...new Set([...(direction.hex || []), ...((dna as { paletteHex?: string[] }).paletteHex || [])])];
   const preset = context?.campaignPreset ? presetById(context.campaignPreset) : null;
+  const hasApproved = Boolean(context?.approvedImagePrompt?.trim());
 
   return JSON.stringify({
+    userReviewedVisualDirection: context?.approvedImagePrompt?.trim() || undefined,
+    projectArchitectureStyle: dna.architecture,
     company: {
       name: context?.brandName,
       primaryColor: context?.brandColor,
@@ -118,11 +182,14 @@ function userPrompt(brief: Brief, dna: DNA, direction: Direction, kinds: string[
       name: brief.name,
       location: brief.location,
       propertyType: brief.propertyType,
+      architecturalStyle: dna.architecture,
+      description: brief.description || undefined,
       confirmedAmenities: dna.usps,
-      architectureMaterials: dna.architecture,
       lightingAtmosphere: dna.lighting,
       audience: dna.audience,
     },
+    referenceWebsite: getReferenceWebsite(context),
+    campaignArchitectureVariation: campaignArchitectureVariation(context?.campaignId),
     campaign: preset ? { preset: preset.label, objective: preset.objective } : undefined,
     brandToneAndColorGrade: {
       directionName: direction.name,
@@ -135,13 +202,13 @@ function userPrompt(brief: Brief, dna: DNA, direction: Direction, kinds: string[
       aspectRatio: context?.aspectRatio,
       composition: aspectComposition(context?.aspectRatio),
     },
-    approvedVisualDirection: context?.approvedImagePrompt,
     adFormatsNeeded: kinds,
     spatialZoningGuidancePerFormat: Object.fromEntries(
       kinds.filter((k) => KIND_PHOTOGRAPHY[k]).map((k) => [k, KIND_PHOTOGRAPHY[k]])
     ),
-    instruction:
-      "Write one unique, technically specific background-photo prompt per format. Treat approvedVisualDirection as user guidance, adapt it to the company, property facts, campaign, placement and exact aspect ratio. Typography and the white CTA ribbon are added by the ad layout, never render them into the image. Return JSON only.",
+    instruction: hasApproved
+      ? "The user-reviewed direction defines the property facts, architectural character, finishes, and atmosphere, not a facade to copy exactly. Apply 'campaignArchitectureVariation' as the required new building design for this campaign. Adapt camera framing for each format while keeping the new campaign-specific architecture visually consistent across those formats. Return JSON only."
+      : "Write one unique, technically specific background-photo prompt per format matching the verified architectural style ('projectArchitectureStyle') and project description. Typography and the white CTA ribbon are added by the ad layout, never render them into the image. Return JSON only.",
   });
 }
 
@@ -155,7 +222,12 @@ function parsePromptSet(content: string, kinds: string[], context?: ImagePromptC
     const result: ImagePromptSet = {};
     for (const kind of kinds) {
       if (typeof parsed[kind] === "string" && (parsed[kind] as string).trim()) {
-        result[kind] = finishPrompt((parsed[kind] as string).trim(), context?.aspectRatio);
+        result[kind] = finishPrompt(
+          (parsed[kind] as string).trim(),
+          context?.aspectRatio,
+          getReferenceWebsite(context),
+          campaignArchitectureVariation(context?.campaignId)
+        );
       }
     }
     return Object.keys(result).length > 0 ? result : null;
@@ -174,12 +246,33 @@ function localFallbackPrompts(
   const dirStyle = DIRECTION_STYLE[direction.id] ?? DIRECTION_STYLE["golden-hour-cinema"];
   const palette = [...new Set([...(direction.hex || []), ...((dna as { paletteHex?: string[] }).paletteHex || [])])].join(", ");
   const preset = context?.campaignPreset ? presetById(context.campaignPreset) : null;
-  const confirmedFeatures = dna.usps.length ? `Confirmed features: ${dna.usps.join(", ")}.` : "Do not introduce unconfirmed amenities or property claims.";
-  const base = `${brief.propertyType} at ${brief.name}, ${brief.location}. ${dna.architecture}. ${confirmedFeatures} ${dna.lighting}. ${dirStyle}. ${direction.grade}. Brand ${context?.brandName || "identity"}; tones ${(context?.brandTones || []).join(", ") || dna.brandTone}; accent ${context?.brandColor || palette}. ${preset ? `${preset.label} campaign for ${preset.objective}.` : ""} ${context?.approvedImagePrompt || ""} ${aspectComposition(context?.aspectRatio)}. Premium photographic treatment, realistic materials, controlled lens perspective and natural depth.`;
+  const confirmedFeatures = dna.usps.length ? `Confirmed features: ${dna.usps.join(", ")}.` : "";
   const set: ImagePromptSet = {};
+
+  if (context?.approvedImagePrompt?.trim()) {
+    const userApproved = context.approvedImagePrompt.trim().replace(/[.;,\s]+$/, "");
+    for (const kind of kinds) {
+      const guide = KIND_PHOTOGRAPHY[kind] ?? "establishing exterior shot with clean negative space in upper third";
+      set[kind] = finishPrompt(
+        `${userApproved}; ${aspectComposition(context?.aspectRatio)}; ${guide}; architectural photography preserving verified ${dna.architecture} materials; natural daylight exposure`,
+        context?.aspectRatio,
+        getReferenceWebsite(context),
+        campaignArchitectureVariation(context?.campaignId)
+      );
+    }
+    return set;
+  }
+
+  const descSnippet = brief.description ? `Architectural cues: ${brief.description.slice(0, 160)}. ` : "";
+  const base = `Photorealistic architectural photography of ${brief.name}, ${brief.propertyType} in ${brief.location}. Architecture: ${dna.architecture}. ${descSnippet}${confirmedFeatures} Lighting: ${dna.lighting}. ${dirStyle}. ${direction.grade}. Brand ${context?.brandName || "identity"}; tones ${(context?.brandTones || []).join(", ") || dna.brandTone}; accent ${context?.brandColor || palette}. ${preset ? `${preset.label} campaign for ${preset.objective}.` : ""} ${aspectComposition(context?.aspectRatio)}. Premium photographic treatment, realistic facade materials, controlled lens perspective and natural depth.`;
   for (const kind of kinds) {
     const guide = KIND_PHOTOGRAPHY[kind] ?? "establishing exterior shot with clean negative space in upper third";
-    set[kind] = finishPrompt(`${base} ${guide}`, context?.aspectRatio);
+    set[kind] = finishPrompt(
+      `${base} ${guide}`,
+      context?.aspectRatio,
+      getReferenceWebsite(context),
+      campaignArchitectureVariation(context?.campaignId)
+    );
   }
   return set;
 }
@@ -202,6 +295,15 @@ export async function writeImagePrompts(
   modelOverride?: string | null,
   context?: ImagePromptContext
 ): Promise<WritePromptsResult> {
+  const approvedPrompt = context?.approvedImagePrompt?.trim();
+  if (context && approvedPrompt) {
+    return {
+      prompts: approvedPromptSet(kinds, context),
+      model: "user-approved-prompt (preserved)",
+      fallback: false,
+    };
+  }
+
   const agnesKey = process.env.AGNES_API_KEY?.trim();
   const openrouterKey = process.env.OPENROUTER_API_KEY?.trim();
   const agnesBase = (process.env.AGNES_BASE_URL?.trim() || "https://apihub.agnes-ai.com/v1").replace(/\/+$/, "");
