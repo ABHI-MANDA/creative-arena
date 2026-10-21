@@ -1143,6 +1143,9 @@ export function CampaignWorkspace({
                         {a.payload.imageSource === "ai-generated" ? "AI image generation prompt" : "AI photography direction"}
                       </summary>
                       <p className="mt-2 text-[11px] leading-relaxed text-faint">{a.payload.imageGenPrompt ?? a.payload.imagePrompt}</p>
+                      {a.payload.imageGenModel && (
+                        <p className="mt-1 font-mono text-[9px] text-faint">Image model: {a.payload.imageGenModel}</p>
+                      )}
                       {a.payload.imageQualityScore !== undefined && (
                         <p className="mt-1 font-mono text-[9px] text-gold">Image quality score: {a.payload.imageQualityScore}</p>
                       )}
