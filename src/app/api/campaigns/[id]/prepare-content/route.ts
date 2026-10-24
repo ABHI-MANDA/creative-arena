@@ -43,13 +43,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       : directionsFor(dna as Parameters<typeof directionsFor>[0], brief);
     const direction = options.find((o) => o.id === body.directionId) ?? options[0];
 
-    const selection = body.model ?? (await getAppSetting(`campaign-model:${id}`, "auto"));
+    const savedSelection = await getAppSetting(`campaign-model:${id}`, "auto");
+    let selection = body.model ?? savedSelection;
     if (selection !== "auto" && !(await isFreeOpenRouterModel(selection))) {
-      return NextResponse.json(
-        { error: "Choose a currently available free text model, or use Automatic." },
-        { status: 400 }
-      );
+      if (body.model !== undefined) {
+        return NextResponse.json(
+          { error: "Choose a currently available free text model, or use Automatic." },
+          { status: 400 }
+        );
+      }
+      selection = "auto";
     }
+    await setAppSetting(`campaign-model:${id}`, selection);
     const requestedModel = await resolveOpenRouterModel(selection);
 
     const templateLibrary = await getAppSetting<TemplateLibrary>(TEMPLATE_LIBRARY_KEY, DEFAULT_TEMPLATE_LIBRARY);
@@ -71,8 +76,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       direction,
       { name: brand.name, color: brand.color, tones: brand.tones }
     );
-    await setAppSetting(`campaign-model:${id}`, model);
-
+    await setAppSetting(`campaign-model-used:${id}`, model);
     const draftContent = buildDraftAdContent(
       brief,
       dna as Parameters<typeof buildDraftAdContent>[1],

@@ -505,6 +505,7 @@ async function getLocalCampaignBundle(id: string) {
     return {
       campaign,
       selectedModel: database.settings.find((row) => row.key === `campaign-model:${id}`)?.value as string | undefined,
+      usedModel: database.settings.find((row) => row.key === `campaign-model-used:${id}`)?.value as string | undefined,
       property,
       images: database.propertyImages
         .filter((row) => row.propertyId === property.id)
@@ -522,6 +523,7 @@ async function getLocalCampaignBundle(id: string) {
     return {
       ...bundle,
       selectedModel: bundle.selectedModel,
+      usedModel: bundle.usedModel,
       assets: bundle.assets.filter((row) => row.campaignId === id).sort((a, b) => a.kind.localeCompare(b.kind)),
     };
   });
@@ -539,12 +541,13 @@ export async function getCampaignBundle(id: string) {
       const campaign = camps[0];
 
       // Scoped queries for ONLY this campaign and its parent property
-      const [prop, images, dnaRows, campAssets, selectedModel] = await Promise.all([
+      const [prop, images, dnaRows, campAssets, selectedModel, usedModel] = await Promise.all([
         db.select().from(properties).where(eq(properties.id, campaign.propertyId)).limit(1),
         db.select().from(propertyImages).where(eq(propertyImages.propertyId, campaign.propertyId)).orderBy(propertyImages.sort),
         db.select().from(propertyDna).where(eq(propertyDna.propertyId, campaign.propertyId)).limit(1),
         db.select().from(assets).where(eq(assets.campaignId, id)).orderBy(assets.kind),
         getAppSetting<string | undefined>(`campaign-model:${id}`, undefined),
+        getAppSetting<string | undefined>(`campaign-model-used:${id}`, undefined),
       ]);
 
       recordDbMetric("getCampaignBundle", Date.now() - started, 1, 4000);
@@ -559,6 +562,7 @@ export async function getCampaignBundle(id: string) {
         campaigns: [campaign],
         assets: campAssets,
         selectedModel,
+        usedModel,
       };
     } catch (err) {
       console.warn("PostgreSQL getCampaignBundle failed, falling back to local JSON DB:", err);

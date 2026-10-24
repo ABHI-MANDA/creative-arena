@@ -257,10 +257,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const direction = options.find((o) => o.id === body.directionId) ?? options[0];
 
     const started = Date.now();
-    const selection = body.model ?? (await getAppSetting(`campaign-model:${id}`, "auto"));
+    const savedSelection = await getAppSetting(`campaign-model:${id}`, "auto");
+    let selection = body.model ?? savedSelection;
     if (selection !== "auto" && !(await isFreeOpenRouterModel(selection))) {
-      return NextResponse.json({ error: "Choose a currently available free text model, or use Automatic." }, { status: 400 });
+      if (body.model !== undefined) {
+        return NextResponse.json({ error: "Choose a currently available free text model, or use Automatic." }, { status: 400 });
+      }
+      selection = "auto";
     }
+    await setAppSetting(`campaign-model:${id}`, selection);
     const requestedModel = await resolveOpenRouterModel(selection);
     const templateLibrary = await getAppSetting<TemplateLibrary>(TEMPLATE_LIBRARY_KEY, DEFAULT_TEMPLATE_LIBRARY);
     const enabledKinds = templateLibrary.enabledKinds;
@@ -311,7 +316,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       override = llmResult.override;
       model = llmResult.model;
       fallback = llmResult.fallback;
-      await setAppSetting(`campaign-model:${id}`, model);
+    }
+    if (!approvedContent) {
+      await setAppSetting(`campaign-model-used:${id}`, model);
     }
 
     const platformIds = bundle.campaign.platforms ?? [];
