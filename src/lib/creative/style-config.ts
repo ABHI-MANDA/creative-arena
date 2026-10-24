@@ -8,7 +8,7 @@ export type ScrimSettings = {
 
 export const DEFAULT_SCRIM_SETTINGS: ScrimSettings = {
   opacity: 65,
-  color: "#0c1012",
+  color: "#3492c9",
   height: 48,
 };
 

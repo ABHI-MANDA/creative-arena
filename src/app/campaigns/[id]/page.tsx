@@ -21,10 +21,9 @@ export default async function CampaignPage({
   if (!bundle) notFound();
 
   const { campaign, property, images, assets } = bundle;
-  const contentModel = bundle.usedModel ??
-    (bundle.selectedModel && bundle.selectedModel !== "auto"
-      ? bundle.selectedModel
-      : actions.find((action) => action.kind === "compose" || action.kind === "video-script")?.model ?? "Not generated yet");
+  const contentModel = bundle.selectedModel && bundle.selectedModel !== "auto"
+    ? bundle.selectedModel
+    : actions.find((action) => action.kind === "compose" || action.kind === "video-script")?.model ?? "Not generated yet";
 
   const brief = {
     name: property.name,
