@@ -2,6 +2,8 @@
 
 M & A features a **dual-engine resilient database architecture**: a high-speed local file-backed JSON database for zero-config local/containerized deployments, and production **PostgreSQL via Drizzle ORM** (optimized for **Neon Serverless Postgres**).
 
+> 🔒 **Security Protocol**: See [`secury.md`](./secury.md) & [`SECURITY.md`](./SECURITY.md) for full data protection specifications.
+
 ---
 
 ## 1. Dual-Engine Architecture
@@ -117,3 +119,12 @@ The database includes an idempotent auto-seed routine via `ensureSeed()`. If the
 - Configures default brand settings.
 
 Once data exists, `ensureSeed()` returns immediately with zero database writes.
+
+---
+
+## 7. Database Security & Data Integrity
+
+1. **SQL Injection (SQLi) Immunity**: All PostgreSQL queries use Drizzle ORM's strictly typed prepared statements with parameter substitution. Raw SQL strings are prohibited.
+2. **Cascading Relational Deletes**: Foreign key constraints enforce `onDelete: "cascade"`, preventing orphaned rows and data leaks.
+3. **Atomic Mutex on Local JSON Engine**: File writes in `src/lib/storage.ts` execute inside a serialized promise queue, writing to a temp file and performing an atomic rename. This prevents half-written payloads or file corruption during process termination.
+4. **Credential Isolation**: Database credentials (`DATABASE_URL`) are read exclusively from environment variables on the server side and are never bundled into client bundles or emitted in logs.

@@ -3,7 +3,8 @@
 All routes are same-origin Next.js App Router handlers located under `/api`. JSON request bodies require `Content-Type: application/json`. Dynamic `{id}` parameters are UUIDs unless otherwise noted.
 
 > 🌐 **Live Website**: [M & A — AI Real Estate Creative Studio](https://creativearena.netlify.app/)  
-> 🐳 **Docker Endpoint**: `http://localhost:3000/api`
+> 🐳 **Docker Endpoint**: `http://localhost:3000/api`  
+> 🔒 **Security Protocol**: See [`secury.md`](./secury.md) & [`SECURITY.md`](./SECURITY.md)
 
 ---
 
@@ -15,7 +16,7 @@ All routes are same-origin Next.js App Router handlers located under `/api`. JSO
 | `GET` | `/api/models` | List configured OpenRouter text & copywriting models |
 | `GET` | `/api/image-models` | List available Agnes AI and FLUX image generation models |
 | `POST` | `/api/properties/scrape` | Scrape structured property briefs, pricing, amenities, and photos from listing URLs |
-| `GET` | `/api/proxy-image` | Proxy external or scraped property images with CORS headers to prevent canvas tainting |
+| `GET` | `/api/proxy-image` | Proxy external or scraped property images with CORS & immutable edge cache headers |
 | `GET` | `/api/properties` | List all saved properties with cover thumbnails and Creative DNA status |
 | `POST` | `/api/properties` | Create a new property from brief and photos, automatically analyzing its Creative DNA |
 | `POST` | `/api/properties/{id}/analyze` | Recompute and save Creative DNA for an existing property |
@@ -160,6 +161,11 @@ Scrapes listing web pages and extracts structured real estate specifications.
 #### `GET /api/proxy-image?url={encodedUrl}`
 Proxies external images through the server with `Access-Control-Allow-Origin: *` headers, ensuring HTML5 canvas snapshots render cleanly without cross-origin tainting.
 
+**Security & Caching Headers Emitted:**
+- `Access-Control-Allow-Origin: *`
+- `Cache-Control: public, max-age=604800, stale-while-revalidate=2592000, immutable` (7 days fresh, 30 days stale, immutable edge cache)
+- Strips incoming client cookies, auth headers, and tracking parameters before upstream dispatch.
+
 ---
 
 ### 4. Content Review & Generation Pipeline
@@ -265,3 +271,21 @@ Extracts filtered operational activity across properties, campaigns, assets, and
 - `type`: Record type (`property`, `campaign`, `asset`, `generation`).
 - `status`: Execution status (`ready`, `failed`, `improving`).
 - `format`: Output format (`json` or `csv`).
+
+---
+
+### 7. Universal HTTP Security & Privacy Headers
+
+All API endpoints and rendered routes are protected by default HTTP response security headers defined in [`next.config.ts`](file:///c:/Users/Abhishek%20Kumar/Desktop/ABHI_WORKSPACE/CREATIVE-ARENA/next.config.ts):
+
+| Header | Production Value | Protection Level |
+|---|---|---|
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | 2-year TLS enforcement; MITM downgrade defense |
+| `Content-Security-Policy` | `default-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; ...` | Level-3 CSP; blocks XSS, plugin exploits, form hijacking |
+| `Cross-Origin-Opener-Policy` | `same-origin` | Top-level context isolation against Spectre & opener attacks |
+| `X-Frame-Options` | `SAMEORIGIN` | Anti-clickjacking protection |
+| `X-Content-Type-Options` | `nosniff` | Strict MIME-type enforcement; disables drive-by execution |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | URL/token leak prevention |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), browsing-topics=(), payment=()` | Zero hardware access; blocks Google FLoC/Topics tracking |
+
+For full specification and audit procedures, refer to [`secury.md`](./secury.md).

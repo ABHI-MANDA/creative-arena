@@ -62,7 +62,7 @@ export default async function OverviewPage() {
       locationLabel: "Alibaug, MH",
       priceLine: "₹4.25 Cr",
       cta: "Schedule Private Tour",
-      image: "https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=1200&q=80",
+      image: "/images/props/villa-hero.jpg",
       hex: ["#c99a4e", "#17251b"],
       bullets: ["Private Pool", "Ocean View", "Gated Community"],
     },
@@ -88,10 +88,10 @@ export default async function OverviewPage() {
             An AI Creative Production Agent that understands a brand, analyzes references, plans campaigns, selects the appropriate AI models, generates content, evaluates the results, and continuously improves the campaign.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/properties/new" prefetch={true} className="btn-gold flex items-center gap-2 rounded-xl px-5 py-3 text-[13.5px] font-semibold">
+              <Link href="/properties/new" prefetch={true} aria-label="Create New Property" className="btn-gold flex items-center gap-2 rounded-xl px-5 py-3 text-[13.5px] font-semibold">
                 <Plus size={15} /> Create New Property
               </Link>
-              <Link href="/campaigns/new" prefetch={true} className="btn-ghost flex items-center gap-2 rounded-xl px-5 py-3 text-[13.5px] text-gold">
+              <Link href="/campaigns/new" prefetch={true} aria-label="Create New Campaign" className="btn-ghost flex items-center gap-2 rounded-xl px-5 py-3 text-[13.5px] text-gold">
                 New Campaign <ArrowUpRight size={14} />
               </Link>
             </div>
@@ -131,7 +131,7 @@ export default async function OverviewPage() {
               kicker="Portfolio"
               title="Recent Projects"
               action={
-                <Link href="/properties" prefetch={true} className="btn-ghost rounded-lg px-3.5 py-2 text-[12px] text-mute">
+                <Link href="/properties" prefetch={true} aria-label="View all properties" className="btn-ghost rounded-lg px-3.5 py-2 text-[12px] text-mute">
                   All properties
                 </Link>
               }
@@ -148,7 +148,7 @@ export default async function OverviewPage() {
               kicker="Production"
               title="Campaigns"
               action={
-                <Link href="/campaigns" prefetch={true} className="btn-ghost rounded-lg px-3.5 py-2 text-[12px] text-mute">
+                <Link href="/campaigns" prefetch={true} aria-label="View all campaigns" className="btn-ghost rounded-lg px-3.5 py-2 text-[12px] text-mute">
                   All campaigns
                 </Link>
               }
@@ -215,7 +215,7 @@ export default async function OverviewPage() {
                 <div className="font-mono text-[10px] uppercase tracking-widest text-faint">{stats.brand.tones.join(" · ")}</div>
               </div>
             </div>
-            <Link href="/brand" prefetch={true} className="btn-ghost mt-4 flex items-center justify-center rounded-lg px-3 py-2 text-[12px] text-mute">
+            <Link href="/brand" prefetch={true} aria-label="Open Brand Kit" className="btn-ghost mt-4 flex items-center justify-center rounded-lg px-3 py-2 text-[12px] text-mute">
               Open Brand Kit
             </Link>
           </div>

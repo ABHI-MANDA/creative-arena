@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Building2, Clapperboard, FolderOpen, MapPin, PlaySquare, Share2 } from "lucide-react";
 import type { CampaignRow, PropertyCard as PropertyCardT } from "@/db/queries";
@@ -10,13 +11,21 @@ export function PropertyCard({ card }: { card: PropertyCardT }) {
   const cover = images.find((i) => i.label === "Exterior")?.url ?? images[0]?.url;
   return (
     <div className="panel panel-hover group overflow-hidden">
-      <Link href={`/properties/${p.id}`} prefetch={true} className="relative block aspect-[16/8.6] overflow-hidden">
+      <Link
+        href={`/properties/${p.id}`}
+        prefetch={true}
+        className="relative block aspect-[16/8.6] overflow-hidden"
+        aria-label={`View property details for ${p.name}`}
+      >
         {cover && (
-          <img
+          <Image
             src={cover}
             alt={p.name}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 360px"
             loading="lazy"
             decoding="async"
+            unoptimized={cover.startsWith("data:")}
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.045]"
           />
         )}
@@ -49,13 +58,28 @@ export function PropertyCard({ card }: { card: PropertyCardT }) {
         <span className="font-mono">{images.length} shots</span>
       </div>
       <div className="grid grid-cols-2 gap-2 p-3">
-        <Link href={`/campaigns/new?property=${p.id}`} prefetch={true} className="btn-gold flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] font-semibold">
+        <Link
+          href={`/campaigns/new?property=${p.id}`}
+          prefetch={true}
+          aria-label={`Create campaign for ${p.name}`}
+          className="btn-gold flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] font-semibold"
+        >
           Create Campaign <ArrowRight size={12} />
         </Link>
-        <Link href={`/campaigns/new?property=${p.id}&platforms=9:16`} prefetch={true} className="btn-ghost flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-gold">
+        <Link
+          href={`/campaigns/new?property=${p.id}&platforms=9:16`}
+          prefetch={true}
+          aria-label={`Generate 9:16 ad for ${p.name}`}
+          className="btn-ghost flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-gold"
+        >
           <PlaySquare size={12.5} /> Generate 9:16 Ad
         </Link>
-        <Link href={`/campaigns/new?property=${p.id}&platforms=9:16,1:1,4:5,16:9`} prefetch={true} className="btn-ghost col-span-2 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-mute">
+        <Link
+          href={`/campaigns/new?property=${p.id}&platforms=9:16,1:1,4:5,16:9`}
+          prefetch={true}
+          aria-label={`Generate multi-platform ads for ${p.name}`}
+          className="btn-ghost col-span-2 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11.5px] text-mute"
+        >
           <Share2 size={12.5} /> Generate Ads · 9:16 + 1:1 + 4:5 + 16:9
         </Link>
       </div>
@@ -69,11 +93,21 @@ export function CampaignRowCard({ row }: { row: CampaignRow }) {
     <Link
       href={`/campaigns/${c.id}`}
       prefetch={true}
+      aria-label={`View campaign ${c.name} for ${propertyName}`}
       className="panel panel-hover group flex items-center gap-4 px-4 py-3.5"
     >
       <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg hairline">
         {cover ? (
-          <img src={cover} alt={c.name} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+          <Image
+            src={cover}
+            alt={c.name}
+            fill
+            sizes="80px"
+            loading="lazy"
+            decoding="async"
+            unoptimized={cover.startsWith("data:")}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-panel2 text-faint">
             <Building2 size={16} />

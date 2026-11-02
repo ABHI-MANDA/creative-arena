@@ -6,6 +6,7 @@ M & A Creative Arena features a production-grade, multi-stage Docker build utili
 - 🔒 **Security**: Runs under an unprivileged non-root system user (`nextjs:nodejs`, UID `1001`)
 - 💾 **Persistence**: Mountable volume for the built-in local database (`.local-db`)
 - 🩺 **Health Monitoring**: Integrated container healthcheck querying `/api/health`
+- 🛡️ **Security Protocol**: See [`secury.md`](./secury.md) & [`SECURITY.md`](./SECURITY.md)
 
 ---
 
@@ -104,10 +105,9 @@ If connecting to an external database, point `DATABASE_URL` to your remote Postg
 docker run -d \
   --name creative-arena-app \
   -p 3000:3000 \
+  --env-file .env \
   -e LOCAL_JSON_DB=false \
   -e DATABASE_URL="postgresql://user:password@ep-xyz.neon.tech/neondb?sslmode=require" \
-  -e OPENROUTER_API_KEY="your-openrouter-key" \
-  -e AGNES_API_KEY="your-agnes-key" \
   creative-arena:latest
 ```
 
@@ -128,11 +128,9 @@ docker run -d \
 | `AGNES_MODEL` | `agnes-image-2.1-flash` | Agnes AI image model variant. |
 | `OPENROUTER_API_KEY` | *None* | Key for OpenRouter fallback copywriting & prompt intelligence. |
 | `OPENROUTER_MODEL` | `agnes-3.0-flash` | Text generation model slug. |
-| `IMAGE_API_KEY` | *None* | Optional key for the secondary image-generation API; OpenRouter key may be used when supported. |
+| `IMAGE_API_KEY` | *None* | Optional key for secondary image-generation API. |
 | `IMAGE_API_BASE_URL` | `https://openrouter.ai/api/v1` | Optional secondary image API base URL. |
-| `IMAGE_MODEL` | `black-forest-labs/FLUX.1-schnell:free` | Optional secondary image model slug. Agnes AI is tried first when its key is configured; provider fallback may use Pollinations FLUX. |
-
-When campaign content is approved, its edited image prompt is sent directly to the image provider without prompt rewriting. A property reference URL may be appended only if it is missing from the approved prompt. Generated assets record the actual provider model in their payload. Image-generation errors are returned instead of silently reusing uploaded property photos. New creatives use the sky-blue `#3492c9` scrim unless a saved/custom scrim setting overrides it.
+| `IMAGE_MODEL` | `black-forest-labs/FLUX.1-schnell:free` | Optional secondary image model slug. |
 
 ---
 
@@ -163,3 +161,13 @@ docker cp creative-arena-app:/app/.local-db/database.json ./backup-database.json
 docker cp ./backup-database.json creative-arena-app:/app/.local-db/database.json
 docker restart creative-arena-app
 ```
+
+---
+
+## 6. Container Security & Hardening Controls
+
+1. **Non-Root Runtime (`UID 1001`)**: The container drops privileges to `nextjs:nodejs` prior to application execution, adhering to CIS Docker benchmark recommendations.
+2. **Minimal Surface Area**: Build tools, git histories, and `node_modules` are excluded from the runtime stage via Next.js standalone bundling, resulting in a compact ~83MB runtime image.
+3. **Dedicated Volume Permission Isolation**: The container creates `/app/.local-db` with strict `chown -R nextjs:nodejs`, preventing permission denied errors and blocking access outside the designated mount point.
+4. **Automated Watchdog**: Built-in `HEALTHCHECK` with 30s interval, 3s timeout, and 3 retries ensures failing or zombie processes are automatically flagged for orchestrator reboot.
+5. **Full Edge Headers**: Containers inherit all enterprise security headers (CSP, HSTS, COOP, Permissions-Policy, nosniff) configured in `next.config.ts`.

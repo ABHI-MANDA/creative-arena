@@ -80,7 +80,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="relative z-10 flex min-h-screen">
       {/* Sidebar */}
       <aside className="sticky top-0 hidden h-screen w-[232px] shrink-0 flex-col border-r border-line bg-coal/70 backdrop-blur-xl md:flex">
-        <Link href="/" prefetch={true} className="flex items-center gap-3 border-b border-line px-5 py-5">
+        <Link href="/" prefetch={true} aria-label="Home - M & A AI Creative Studio" className="flex items-center gap-3 border-b border-line px-5 py-5">
           <Image src="/images/brand-logo.png" alt="M & A" width={36} height={36} className="h-9 w-9 object-contain" />
           <div>
             <div className="font-display text-[17px] font-medium tracking-wide">M &amp; A</div>
@@ -166,6 +166,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <Link
               href="/campaigns/new"
               prefetch={true}
+              aria-label="Create quick campaign"
               className="btn-ghost flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12.5px] font-medium text-gold"
             >
               <Sparkles size={14} /> <span className="hidden sm:inline">Quick Campaign</span>
@@ -181,8 +182,15 @@ export function Shell({ children }: { children: ReactNode }) {
             const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} prefetch={true} className={cx("p-2", active ? "text-gold" : "text-faint")}>
-                <Icon size={19} />
+              <Link
+                key={item.href}
+                href={item.href}
+                prefetch={true}
+                aria-label={item.label}
+                className={cx("p-2", active ? "text-gold" : "text-faint")}
+              >
+                <Icon size={19} aria-hidden="true" />
+                <span className="sr-only">{item.label}</span>
               </Link>
             );
           })}
