@@ -1,4 +1,5 @@
 # M & A — AI Real Estate Creative Studio
+## An AI Creative Production Agent that understands a brand, analyzes references, plans campaigns, selects the appropriate AI models, generates content, evaluates the results, and continuously improves the campaign.
 
 > **AI-Powered Real Estate Creative Studio** — Transform property photos, listing URLs, and briefs into photorealistic, typography-composed, ready-to-publish property marketing campaigns with full user approval and in-browser design editing.
 >
