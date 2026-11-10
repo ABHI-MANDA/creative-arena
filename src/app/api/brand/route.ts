@@ -22,6 +22,7 @@ export async function POST(req: Request) {
       thresholds: {
         ready: Math.min(99, Math.max(88, body.thresholds?.ready ?? DEFAULT_BRAND.thresholds.ready)),
         review: Math.min(98, Math.max(50, body.thresholds?.review ?? DEFAULT_BRAND.thresholds.review)),
+        diversity: Math.min(99, Math.max(70, body.thresholds?.diversity ?? body.variationSettings?.diversityThreshold ?? 85)),
       },
     });
     if (merged.thresholds.review >= merged.thresholds.ready) {

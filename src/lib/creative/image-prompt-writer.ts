@@ -13,7 +13,7 @@
  * ------------------------------------------------------------------ */
 
 import type { Brief, DNA, Direction } from "./engine";
-import { presetById } from "./presets";
+import { presetById, type VariationSettings } from "./presets";
 
 export type ImagePromptSet = Record<string, string>; // kind → prompt
 export type ImagePromptContext = {
@@ -26,22 +26,32 @@ export type ImagePromptContext = {
   approvedImagePrompt?: string;
   referenceWebsite?: string;
   campaignId?: string;
+  variationSettings?: VariationSettings;
+  variationStyle?: string;
 };
 
 function aspectComposition(aspectRatio?: string): string {
   switch (aspectRatio) {
     case "9:16":
-      return "vertical 9:16 portrait framing, building in the lower-middle 60%, clean upper 35% for headline and uncluttered bottom 12% for the white CTA ribbon";
+      return "vertical 9:16 soaring upward angle, capturing structural height and vertical facade louvers, building occupying lower-middle 60%, pristine upper 38% clean sky reserved for typography, clean lower 12% for white CTA ribbon, grand upward perspective";
     case "1:1":
-      return "square 1:1 composition, building centred in the lower 60%, clean open upper 35% and clear bottom edge for overlaid copy and CTA";
+      return "balanced square 1:1 architectural portrait, central arrival entrance with tranquil reflecting water surface in foreground, building centred in lower 60%, clean open upper 35% negative space for headline";
     case "4:5":
-      return "portrait 4:5 composition, building anchored in the lower-middle 60%, clean upper 35% and bottom edge reserved for overlaid copy and CTA";
+      return "portrait 4:5 sculptural 3/4 corner perspective showcasing cantilevered balconies and volumetric depth, lower-middle 60% building anchor, clean upper 35% sky for copy";
     case "16:9":
-      return "wide 16:9 advertising composition, property weighted to the right half with uncluttered visual space on the left and a clean lower edge for the CTA ribbon";
+      return "cinematic 16:9 wide-angle architectural landscape, property contextualized within lush estate greenery and twilight horizon, negative space distributed across upper-left for titles, clean lower right";
+    case "4:3":
+      return "classic 4:3 architectural editorial, rich evening ambient light glowing through oversized windows, clean upper 35% for brand header";
+    case "3:2":
+      return "horizontal 3:2 medium telephoto architectural view, crisp structural lines and detailed glass reflections, upper 35% negative space";
+    case "2:3":
+      return "high-fashion 2:3 vertical composition, focus on bespoke materials and cantilevered deck geometry, clean upper 35% sky";
+    case "21:9":
+      return "ultra-wide 21:9 cinematic vista, expansive horizon with infinity pool reflection, structural massing weighted to the right";
     default:
       return aspectRatio
-        ? `compose for the exact ${aspectRatio} advertising aspect ratio, keep the property prominent and preserve uncluttered negative space for overlaid copy and CTA`
-        : "compose with the property prominent and preserve uncluttered negative space for overlaid copy and CTA";
+        ? `compose for the exact ${aspectRatio} advertising aspect ratio, keep the property prominent and preserve uncluttered negative space in upper 35-40% for overlaid copy and CTA`
+        : "compose with the property prominent and preserve uncluttered negative space in upper 35-40% for overlaid copy and CTA";
   }
 }
 
@@ -105,8 +115,18 @@ function approvedPromptSet(kinds: string[], context: ImagePromptContext): ImageP
     ? `\n\nSupplemental property reference only; do not render this URL or let it override the user-approved prompt: ${referenceWebsite}`
     : "";
   const finalPrompt = `${approvedPrompt}${supplementalReference}`;
+  const autoDiversify = context.variationSettings?.autoDiversifyAspects !== false;
 
-  return Object.fromEntries(kinds.map((kind) => [kind, finalPrompt]));
+  return Object.fromEntries(
+    kinds.map((kind) => {
+      if (!autoDiversify || !context.aspectRatio) {
+        return [kind, finalPrompt];
+      }
+      const aspectGuide = aspectComposition(context.aspectRatio);
+      const tailoredPrompt = `${finalPrompt}; Camera perspective & framing: ${aspectGuide}`;
+      return [kind, tailoredPrompt];
+    })
+  );
 }
 
 /* Compositional negative-space guidance per ad format */
@@ -202,13 +222,20 @@ function userPrompt(brief: Brief, dna: DNA, direction: Direction, kinds: string[
       aspectRatio: context?.aspectRatio,
       composition: aspectComposition(context?.aspectRatio),
     },
+    variationDirectives: {
+      intensity: context?.variationSettings?.intensity || "balanced",
+      allowedPerspectives: context?.variationSettings?.allowedPerspectives,
+      preferredTranscriptStyles: context?.variationSettings?.preferredTranscriptStyles,
+      customVariationStyle: context?.variationStyle,
+      compositionAngleForThisAspect: context?.aspectRatio ? aspectComposition(context.aspectRatio) : undefined,
+    },
     adFormatsNeeded: kinds,
     spatialZoningGuidancePerFormat: Object.fromEntries(
       kinds.filter((k) => KIND_PHOTOGRAPHY[k]).map((k) => [k, KIND_PHOTOGRAPHY[k]])
     ),
     instruction: hasApproved
       ? "The user-reviewed direction defines the property facts, architectural character, finishes, and atmosphere, not a facade to copy exactly. Apply 'campaignArchitectureVariation' as the required new building design for this campaign. Adapt camera framing for each format while keeping the new campaign-specific architecture visually consistent across those formats. Return JSON only."
-      : "Write one unique, technically specific background-photo prompt per format matching the verified architectural style ('projectArchitectureStyle') and project description. Typography and the white CTA ribbon are added by the ad layout, never render them into the image. Return JSON only.",
+      : "Write one unique, technically specific background-photo prompt per format matching the verified architectural style ('projectArchitectureStyle') and project description. Introduce distinctive architectural framing and positive variation matching 'variationDirectives' (e.g. dramatic upward angle for 9:16, wide contextual landscape for 16:9, symmetrical reflection for 1:1, sculptural 3/4 depth for 4:5) while maintaining true property identity and materials. Never produce identical repetitive images across different formats. Typography and the white CTA ribbon are added by the ad layout, never render them into the image. Return JSON only.",
   });
 }
 

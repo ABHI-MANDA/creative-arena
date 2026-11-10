@@ -113,6 +113,8 @@ async function tryAIImagePipeline({
         approvedImagePrompt: approvedContent?.imagePrompt?.trim(),
         referenceWebsite,
         campaignId,
+        variationSettings: brand.variationSettings,
+        variationStyle: approvedContent?.variationStyle,
       };
       console.log(`[ai-pipeline] Writing ${platformSpec.aspect} prompts for kinds:`, visualKinds);
       const { prompts, model: promptModel, fallback: promptFallback } = await writeImagePrompts(

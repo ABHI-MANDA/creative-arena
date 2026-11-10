@@ -16,7 +16,11 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const body = (await req.json().catch(() => ({}))) as { directionId?: string; model?: string };
+    const body = (await req.json().catch(() => ({}))) as {
+      directionId?: string;
+      model?: string;
+      variationStyle?: string;
+    };
     const bundle = await getCampaignBundle(id);
     if (!bundle) return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     if (!bundle.dna) return NextResponse.json({ error: "Run property analysis first." }, { status: 400 });
@@ -74,7 +78,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       requestedModel,
       templateInstructions,
       direction,
-      { name: brand.name, color: brand.color, tones: brand.tones }
+      { name: brand.name, color: brand.color, tones: brand.tones },
+      brand.variationSettings,
+      body.variationStyle
     );
     await setAppSetting(`campaign-model-used:${id}`, model);
     const draftContent = buildDraftAdContent(
@@ -83,7 +89,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       direction,
       override,
       brand?.name,
-      bundle.campaign.preset
+      bundle.campaign.preset,
+      brand.variationSettings,
+      body.variationStyle
     );
     draftContent.fontSizes = brand.typographyDefaults.fontSizes;
     draftContent.fontColors = brand.typographyDefaults.fontColors;

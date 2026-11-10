@@ -15,6 +15,8 @@ import {
   type AdFontSizes,
   type AdTextSection,
   type BrandSettings,
+  type TranscriptStyle,
+  type VariationSettings,
 } from "./presets";
 import {
   DEFAULT_SCRIM_SETTINGS,
@@ -109,6 +111,7 @@ export type QCResult = {
   score: number;
   checks: { label: string; pass: boolean }[];
   status: "ready" | "review" | "improving";
+  diversityScore?: number;
 };
 
 export type NewAsset = {
@@ -398,7 +401,132 @@ const FILL = (s: string, brief: Brief, dna: DNA) =>
     .replaceAll("{price}", brief.price)
     .replaceAll("{usp}", dna.usps[0] ?? "details available on request");
 
-export function presetCopy(presetId: string, brief: Brief, dna: DNA): PresetCopy {
+export function presetCopy(
+  presetId: string,
+  brief: Brief,
+  dna: DNA,
+  style?: string,
+  variantSeed = 0
+): PresetCopy {
+  const styles: Record<string, Record<string, PresetCopy>> = {
+    cinematic: {
+      "luxury-property": {
+        kicker: "The {name} Signature",
+        hero: "Where natural stillness meets soaring architecture.",
+        sub: "Bespoke {type} enveloped in considered privacy at {name}.",
+        cta: "Explore Residences",
+        offerKicker: "Private Preview",
+        urgency: "Private viewings by advance appointment",
+        hook: "Step into an address crafted around stillness.",
+      },
+      "project-launch": {
+        kicker: "A Sculptural Arrival",
+        hero: "{name} emerges on the horizon.",
+        sub: "An iconic residential debut: {type} in {location}.",
+        cta: "Register for Inaugural Release",
+        offerKicker: "Premier Allocation",
+        urgency: "Inaugural residence allocations now open",
+        hook: "Witness the arrival of {name} in {location}.",
+      },
+      investment: {
+        kicker: "Enduring Capital Value",
+        hero: "A landmark real estate legacy in {location}.",
+        sub: "Strategic portfolio asset: {type} from {price}.",
+        cta: "Request Investment Portfolio",
+        offerKicker: "Institutional Overview",
+        urgency: "Private investor allocations available upon request",
+        hook: "Where capital growth converges with timeless design.",
+      },
+    },
+    investment: {
+      "luxury-property": {
+        kicker: "Prime Asset Portfolio",
+        hero: "High-yield luxury footprint in {location}.",
+        sub: "Institutional-grade {type} at {name}, from {price}.",
+        cta: "Request Financial Deck",
+        offerKicker: "Investor Priority",
+        urgency: "Prime allocations available for verified investors",
+        hook: "Strategic real estate growth in {city}'s prime corridor.",
+      },
+      "project-launch": {
+        kicker: "First-Mover Allocation",
+        hero: "Capitalize on early-phase pricing at {name}.",
+        sub: "High-demand {type} starting from {price} in {location}.",
+        cta: "Unlock Investor Pricing",
+        offerKicker: "Early Stage Entry",
+        urgency: "Inaugural phase terms expiring shortly",
+        hook: "First-mover advantage arrives in {location}.",
+      },
+      investment: {
+        kicker: "Capital Growth Corridor",
+        hero: "Institutional real estate yield in {location}.",
+        sub: "High-growth {type} poised for capital appreciation from {price}.",
+        cta: "Download ROI Prospectus",
+        offerKicker: "Yield & Growth Model",
+        urgency: "Review full cashflow and appreciation models",
+        hook: "Unlock high-yield real estate performance in {city}.",
+      },
+    },
+    lifestyle: {
+      "luxury-property": {
+        kicker: "Sanctuary for Living",
+        hero: "Space for life to unfold with grace in {location}.",
+        sub: "Lush {type} surrounded by tranquil open landscaping at {name}.",
+        cta: "Experience the Enclave",
+        offerKicker: "Family Haven",
+        urgency: "Schedule a relaxed family walkthrough",
+        hook: "Mornings wrapped in green, evenings spent at home.",
+      },
+      "project-launch": {
+        kicker: "A New Home Story",
+        hero: "Begin your family's next chapter at {name}.",
+        sub: "Thoughtfully crafted {type} in the heart of {location}.",
+        cta: "Book an Experience Tour",
+        offerKicker: "Community Preview",
+        urgency: "Explore the enclave and world-class amenities",
+        hook: "Discover a neighborhood designed for living well.",
+      },
+      investment: {
+        kicker: "Generational Wealth",
+        hero: "A secure family legacy asset in {location}.",
+        sub: "Enduring {type} combining lifestyle beauty with capital stability.",
+        cta: "Explore Legacy Residences",
+        offerKicker: "Generational Value",
+        urgency: "Protect your family's real estate footprint",
+        hook: "Invest in an address your family will treasure for generations.",
+      },
+    },
+    launch: {
+      "luxury-property": {
+        kicker: "Inaugural Unveiling",
+        hero: "{name} sets a new benchmark in {location}.",
+        sub: "Exclusive collection of {type} now open for booking.",
+        cta: "Reserve Your Residence",
+        offerKicker: "Launch Window",
+        urgency: "Phase 1 priority reservations now being accepted",
+        hook: "The wait is over — {name} is officially unveiled.",
+      },
+      "project-launch": {
+        kicker: "Officially Launched",
+        hero: "The most anticipated address in {location}.",
+        sub: "Grand unveiling of {type} at {name}, from {price}.",
+        cta: "Register for Priority Access",
+        offerKicker: "Launch Benefits",
+        urgency: "Pre-registration benefits available for limited window",
+        hook: "Introducing the defining residential launch of the year.",
+      },
+      investment: {
+        kicker: "Phase 1 Launch Rates",
+        hero: "Early investment window now live at {name}.",
+        sub: "Secure launch-stage pricing on {type} in {location}.",
+        cta: "Lock Launch Advantage",
+        offerKicker: "Phase 1 Pricing",
+        urgency: "Inaugural pricing tiers open for immediate booking",
+        hook: "Don't miss the launch window for {name} in {location}.",
+      },
+    },
+  };
+
   const bank: Record<string, PresetCopy> = {
     "luxury-property": {
       kicker: "The {name} Collection",
@@ -491,7 +619,12 @@ export function presetCopy(presetId: string, brief: Brief, dna: DNA): PresetCopy
       hook: "A new perspective on life in {location}.",
     },
   };
-  const c = bank[presetId] ?? bank["luxury-property"];
+
+  const styleKeys = ["cinematic", "investment", "lifestyle", "launch"];
+  const resolvedStyle = style && styles[style] ? style : styleKeys[variantSeed % styleKeys.length];
+  const styleMatch = styles[resolvedStyle]?.[presetId];
+  const c = styleMatch ?? bank[presetId] ?? bank["luxury-property"];
+
   return {
     kicker: FILL(c.kicker, brief, dna),
     hero: FILL(c.hero, brief, dna),
@@ -591,7 +724,9 @@ export async function tryLLMOverride(
   modelOverride?: string | null,
   templateInstructions?: string,
   selectedDirection?: Direction,
-  brandSettings?: Pick<BrandSettings, "name" | "color" | "tones">
+  brandSettings?: Pick<BrandSettings, "name" | "color" | "tones">,
+  variationSettings?: VariationSettings,
+  variationStyle?: string
 ): Promise<{ override: CopyOverride | null; model: string; fallback: boolean }> {
   const agnesKey = process.env.AGNES_API_KEY?.trim();
   const openrouterKey = process.env.OPENROUTER_API_KEY?.trim();
@@ -613,6 +748,10 @@ export async function tryLLMOverride(
     "openrouter/free",
   ].filter((m, i, arr): m is string => Boolean(m && arr.indexOf(m) === i));
 
+  const intensity = variationSettings?.intensity ?? "balanced";
+  const temperature = intensity === "dynamic" ? 0.8 : intensity === "subtle" ? 0.45 : 0.68;
+  const activeStyle = variationStyle || variationSettings?.preferredTranscriptStyles?.[0] || "cinematic";
+
   for (const model of candidateModels) {
     const isAgnesModel = model.toLowerCase().startsWith("agnes-");
     const endpoint = isAgnesModel
@@ -622,7 +761,7 @@ export async function tryLLMOverride(
     if (!apiKey) continue;
 
     try {
-      console.log(`[engine] Requesting copy generation from '${model}' at ${endpoint}...`);
+      console.log(`[engine] Requesting copy generation from '${model}' at ${endpoint} (style=${activeStyle}, intensity=${intensity})...`);
       const res = await fetch(endpoint, {
         method: "POST",
         signal: AbortSignal.timeout(30000),
@@ -632,7 +771,7 @@ export async function tryLLMOverride(
         },
         body: JSON.stringify({
           model,
-          temperature: 0.45,
+          temperature,
           max_tokens: 2400,
           messages: [
             {
@@ -642,15 +781,15 @@ export async function tryLLMOverride(
                 "Return one valid JSON object only; do not use markdown fences or add commentary.",
                 "Use only supplied property facts. Never invent approvals, amenities, distances, returns, scarcity, pricing, completion dates, or guarantees. If a fact is missing, omit it.",
                 "Create polished, premium real-estate advertising with a clear reading order: project identity, one distinctive promise, verifiable proof, then one direct action.",
-                "Write distinctive, specific, readable copy. Avoid cliches, unsupported superlatives, emojis, repeated phrases, and crowded headlines.",
+                "Write distinctive, specific, readable copy with positive creative variations. Avoid repetitive formulas, cliches, unsupported superlatives, emojis, and crowded headlines.",
                 "Keep headlines punchy and concise (max 7 words) so they never crowd the visual or overlay important background elements.",
                 "Keep sublines factual (max 14 words), and CTAs direct. Preserve the exact supplied project name, property type, location, and price in their respective fields.",
                 "Match the supplied company's name, brand tone, and brand palette alongside the selected campaign preset and creative direction, while keeping all property claims factual.",
                 "Return keys: heroHeadline, heroSubline, lifestyleLine, featureHeadline, imagePrompt, captions, hashtags, storyboard.",
                 "captions is an object with optional instagram, facebook, linkedin, whatsapp, portal, youtube strings.",
                 "hashtags is an array of up to 12 strings.",
-                "storyboard is an array of 5 to 8 objects with t, label, visual, line, tag; make total duration 15 seconds for Instagram Reels or 30 seconds for YouTube Shorts, use a clear hook, visual progression, factual proof, and CTA end-frame.",
-                "imagePrompt must specifically capture the project's unique architectural identity, facade materials, structural styling, rooflines, and spatial character based on the property description and property type (e.g. Victorian, Mediterranean, Brutalist, Tropical Modern, Art Deco, Biophilic Green Terraces, Glass High-rise). Avoid generic building descriptions. Anchor structures in the lower-middle frame, maintaining clean open sky negative space in upper 35-40% for typography overlays. Do not ask an image model to render text, logos, prices, or typography. There is no character or word limit on imagePrompt; write an unconstrained, richly detailed photographic brief.",
+                "NARRATIVE SCRIPT & TRANSCRIPT VOICE: In 'storyboard' (5 to 8 shots, 15s for Instagram Reels or 30s for YouTube Shorts), each shot's 'line' must form an authentic, evocative voiceover transcript reflecting the requested style (" + activeStyle + "). Never produce robotic label text like 'hook -> reveal -> CTA'; write polished, conversational, engaging narration that flows seamlessly across the video shots.",
+                "ARCHITECTURAL PERSPECTIVE VARIATION: 'imagePrompt' must specifically capture the project's unique architectural identity, facade materials, structural styling, and spatial character based on the property description and property type. Vary the camera vantage point and atmospheric mood (e.g. dramatic low-angle elevation, twilight glow with interior warm illumination, or landscaped aerial vista). Anchor structures in the lower-middle frame, maintaining clean open sky negative space in upper 35-40% for typography overlays. Do not render text, logos, prices, or typography.",
                 templateInstructions ? `Active template direction (follow unless it conflicts with verified facts): ${templateInstructions}` : "",
               ].filter(Boolean).join(" "),
             },
@@ -677,6 +816,11 @@ export async function tryLLMOverride(
                 },
                 campaignObjective: presetById(presetId).objective,
                 campaignPreset: presetById(presetId).label,
+                variationDirectives: {
+                  intensity,
+                  narrativeStyle: activeStyle,
+                  allowedPerspectives: variationSettings?.allowedPerspectives,
+                },
                 selectedCreativeDirection: selectedDirection ? {
                   name: selectedDirection.name,
                   tagline: selectedDirection.tagline,
@@ -685,7 +829,7 @@ export async function tryLLMOverride(
                   visualApproach: selectedDirection.approach,
                   grade: selectedDirection.grade,
                 } : null,
-                requiredOutput: "Create distinct image-ad copy and an editable short-form video script.",
+                requiredOutput: "Create distinct image-ad copy and an editable short-form video script with fresh, engaging voiceover transcripts.",
               }),
             },
           ],
@@ -803,28 +947,112 @@ export function storyboardFor(
   copy: PresetCopy,
   dir: Direction,
   images: Img[],
-  long = false
+  long = false,
+  style = "cinematic"
 ): Shot[] {
   const img = (pref: string[], i: number) => imageFor(images, pref, i + hx(brief.name));
   const amenityList = dna.usps;
+
+  const styleScripts: Record<string, { short: string[]; long: string[] }> = {
+    cinematic: {
+      short: [
+        copy.hook || "Where architectural stillness meets timeless design.",
+        `Rising over ${brief.location} — ${brief.name}.`,
+        "Every terrace and elevation sculpted with considered intention.",
+        amenityList.length ? `Curated spaces: ${amenityList.slice(0, 2).join(" and ")}.` : "A private sanctuary above the city.",
+        `${copy.cta} — your private walkthrough awaits.`,
+      ],
+      long: [
+        copy.hook || `Dawn breaking over ${cityOf(brief.location)}.`,
+        `An address defined by light and silence: ${brief.name}, ${brief.location}.`,
+        `Sculptural facade in ${dna.architecture.toLowerCase()}, capturing natural daylight.`,
+        `Panoramic interiors designed for seamless indoor-outdoor living.`,
+        amenityList.length ? `Exclusive private amenities: ${amenityList.slice(0, 3).join(" · ")}.` : `Bespoke living crafted for modern distinction.`,
+        `Moments of quiet refinement in every corner.`,
+        `An enduring architectural statement in ${cityOf(brief.location)}.`,
+        `${copy.cta} — ${brief.price}. Reserve your private preview.`,
+      ],
+    },
+    investment: {
+      short: [
+        copy.hook || `Prime address. Unrivalled capital footprint in ${brief.location}.`,
+        `${brief.name} — institutional-grade ${brief.propertyType} in ${cityOf(brief.location)}.`,
+        "Positioned strategically in a high-demand capital growth corridor.",
+        amenityList.length ? `Backed by world-class infrastructure: ${amenityList.slice(0, 2).join(" · ")}.` : "A landmark capital investment.",
+        `${copy.cta} — request the full investor prospectus.`,
+      ],
+      long: [
+        copy.hook || `Strategic wealth creation in ${cityOf(brief.location)}'s prime growth hub.`,
+        `Introducing ${brief.name} — high-yield real estate in ${brief.location}.`,
+        `Architectural excellence with premium capital appreciation fundamentals.`,
+        `Exceptional ${brief.propertyType} inventory starting from ${brief.price}.`,
+        amenityList.length ? `World-class lifestyle amenities: ${amenityList.slice(0, 3).join(" · ")}.` : `High-occupancy residential infrastructure.`,
+        `Strong rental yields and enduring asset appreciation.`,
+        `Limited allocation available for accredited investors.`,
+        `${copy.cta} — lock your priority investor terms today.`,
+      ],
+    },
+    lifestyle: {
+      short: [
+        copy.hook || "Where calm begins and everyday city noise fades away.",
+        `Welcome home to ${brief.name}, ${brief.location}.`,
+        `Expansive ${brief.propertyType} crafted for multi-generational living.`,
+        amenityList.length ? `Life surrounded by ${amenityList.slice(0, 2).join(" and ")}.` : "Open green buffers and private spaces.",
+        `${copy.cta} — experience the community today.`,
+      ],
+      long: [
+        copy.hook || `Mornings wrapped in green, evenings spent at home.`,
+        `A genuine family sanctuary at ${brief.name}, ${brief.location}.`,
+        `Generous courtyards and open living spaces bathed in natural light.`,
+        `Rooms crafted for everyday memories and shared laughter.`,
+        amenityList.length ? `Enclave amenities for all ages: ${amenityList.slice(0, 3).join(" · ")}.` : `Safe, pedestrian-first gated environment.`,
+        `Minutes from premier schools and everyday conveniences.`,
+        `A neighborhood designed for living well for generations.`,
+        `${copy.cta} — schedule your family's experience tour.`,
+      ],
+    },
+    launch: {
+      short: [
+        copy.hook || `The wait is over — ${brief.name} has officially arrived.`,
+        `The newest benchmark for architectural living in ${brief.location}.`,
+        `Discover the inaugural collection of ${brief.propertyType}.`,
+        amenityList.length ? `Premier features: ${amenityList.slice(0, 3).join(" · ")}.` : "Limited residences now released.",
+        `${copy.cta} — book your preview allocation now.`,
+      ],
+      long: [
+        copy.hook || `The defining real estate unveiling of the season has arrived.`,
+        `Presenting ${brief.name} — now launching in ${brief.location}.`,
+        `Inaugural phase release: ${brief.propertyType} from ${brief.price}.`,
+        `Unprecedented architectural design and grand double-height entrance.`,
+        amenityList.length ? `Flagship amenities: ${amenityList.slice(0, 3).join(" · ")}.` : `World-class private club and wellness facilities.`,
+        `First-mover pricing advantages for early registered buyers.`,
+        `Prime units now open for advance selection.`,
+        `${copy.cta} — register immediately for launch privileges.`,
+      ],
+    },
+  };
+
+  const scriptSet = styleScripts[style] ?? styleScripts.cinematic;
+
   if (!long) {
     return [
-      { t: "0–3s", label: "HOOK", visual: `Fast push-in on the facade, ${dna.lighting.toLowerCase()} flare`, line: copy.hook, tag: "Match cut" },
-      { t: "3–6s", label: "EXTERIOR", visual: `Slow reveal of supplied property imagery — ${dna.architecture.toLowerCase()}`, line: `${brief.name}, ${brief.location}.`, tag: "Whip pan" },
-      { t: "6–9s", label: "DETAILS", visual: "Move across supplied interior photographs; do not add unverified rooms or finishes", line: `Explore ${brief.propertyType} at ${brief.name}.`, tag: "Speed ramp" },
-      { t: "9–12s", label: amenityList.length ? "AMENITIES" : "PROPERTY", visual: amenityList.length ? `${amenityList.slice(0, 3).join(" · ")} — detail montage` : "A clean sequence of supplied property images", line: amenityList.length ? `${amenityList.slice(0, 3).join(" · ")}.` : `${brief.name} · ${brief.propertyType}.`, tag: "Rhythm cuts" },
-      { t: "12–15s", label: "CTA", visual: "Logo resolve, directions chip, CTA card", line: `${copy.cta} — tap the link.`, tag: "Settle frame" },
+      { t: "0–3s", label: "HOOK", visual: `Fast push-in on the facade, ${dna.lighting.toLowerCase()} flare`, line: scriptSet.short[0], tag: "Match cut" },
+      { t: "3–6s", label: "EXTERIOR", visual: `Slow reveal of property imagery — ${dna.architecture.toLowerCase()}`, line: scriptSet.short[1], tag: "Whip pan" },
+      { t: "6–9s", label: "DETAILS", visual: "Move across verified interior and terrace photographs", line: scriptSet.short[2], tag: "Speed ramp" },
+      { t: "9–12s", label: amenityList.length ? "AMENITIES" : "PROPERTY", visual: amenityList.length ? `${amenityList.slice(0, 3).join(" · ")} — detail montage` : "A clean sequence of property images", line: scriptSet.short[3], tag: "Rhythm cuts" },
+      { t: "12–15s", label: "CTA", visual: "Logo resolve, directions chip, CTA card", line: scriptSet.short[4], tag: "Settle frame" },
     ];
   }
+
   return [
-    { t: "0–3s", label: "HOOK", visual: `Aerial drift over ${cityOf(brief.location)}, dawn haze`, line: copy.hook, tag: "Drone in" },
-    { t: "3–6s", label: "LOCATION", visual: `On-screen location title: ${brief.location}`, line: `${brief.name}, ${brief.location}.`, tag: "Map wipe" },
-    { t: "6–10s", label: "EXTERIOR", visual: `Facade reveal, ${dna.lighting.toLowerCase()}`, line: `${brief.name}, ${brief.location}.`, tag: "Dolly" },
-    { t: "10–14s", label: "DETAILS", visual: "Interior sequence using supplied property photographs only", line: `Explore ${brief.propertyType} at ${brief.name}.`, tag: "Gimbal" },
-    { t: "14–18s", label: amenityList.length ? "AMENITIES" : "PROPERTY", visual: amenityList.length ? `${amenityList.join(" · ")} montage` : "Sequence the supplied property photographs", line: amenityList.length ? `${amenityList.join(" · ")}.` : `${brief.name} · ${brief.propertyType}.`, tag: "Rhythm cuts" },
-    { t: "18–22s", label: "LIFESTYLE", visual: "Use supplied lifestyle footage only when available; otherwise continue the property-photo sequence", line: `A closer look at ${brief.name}.`, tag: "Match cut" },
-    { t: "22–26s", label: "PROJECT", visual: `Detail frame: ${dna.architecture.toLowerCase()}`, line: `${brief.name} · ${brief.propertyType}.`, tag: "Macro" },
-    { t: "26–30s", label: "CTA", visual: "Logo resolve + CTA card + QR", line: `${copy.cta} — ${brief.price}.`, tag: "Settle frame" },
+    { t: "0–3s", label: "HOOK", visual: `Aerial drift over ${cityOf(brief.location)}, dawn haze`, line: scriptSet.long[0], tag: "Drone in" },
+    { t: "3–6s", label: "LOCATION", visual: `On-screen location title: ${brief.location}`, line: scriptSet.long[1], tag: "Map wipe" },
+    { t: "6–10s", label: "EXTERIOR", visual: `Facade reveal, ${dna.lighting.toLowerCase()}`, line: scriptSet.long[2], tag: "Dolly" },
+    { t: "10–14s", label: "DETAILS", visual: "Interior sequence showcasing spatial flow and finishes", line: scriptSet.long[3], tag: "Gimbal" },
+    { t: "14–18s", label: amenityList.length ? "AMENITIES" : "PROPERTY", visual: amenityList.length ? `${amenityList.join(" · ")} montage` : "Sequence of verified property photographs", line: scriptSet.long[4], tag: "Rhythm cuts" },
+    { t: "18–22s", label: "LIFESTYLE", visual: "Atmospheric perspective through living rooms and balconies", line: scriptSet.long[5], tag: "Match cut" },
+    { t: "22–26s", label: "PROJECT", visual: `Detail frame: ${dna.architecture.toLowerCase()}`, line: scriptSet.long[6], tag: "Macro" },
+    { t: "26–30s", label: "CTA", visual: "Logo resolve + CTA card + QR", line: scriptSet.long[7], tag: "Settle frame" },
   ].map((s, i) => ({ ...s, tag: s.tag, ...(i === -1 ? { visual: img([], i) } : {}) }));
 }
 
@@ -843,7 +1071,7 @@ export function imageFor(images: Img[], prefer: string[], seed: number): string 
 
 export function qualityCheck(
   seedStr: string,
-  thresholds: { ready: number; review: number }
+  thresholds: { ready: number; review: number; diversity?: number }
 ): QCResult {
   const h = hx(seedStr);
   const score = 82 + (h % 18); // 82..99
@@ -852,12 +1080,20 @@ export function qualityCheck(
   else if (score >= thresholds.review) fails = 1 + (h % 3);
   else fails = 4 + (h % 3);
   const stride = 1 + (h % 4);
-  const checks = QC_CHECKLIST.map((label, i) => ({ label, pass: true }));
+  const checks = QC_CHECKLIST.map((label) => ({ label, pass: true }));
   for (let k = 0; k < fails; k++) checks[(h + k * stride * 3) % checks.length].pass = false;
+
+  const diversityChecks = checks.filter((c) =>
+    c.label.includes("diversity") || c.label.includes("freshness") || c.label.includes("tailoring")
+  );
+  const diversityPass = diversityChecks.filter((c) => c.pass).length;
+  const diversityScore = Math.round(80 + (diversityPass / Math.max(1, diversityChecks.length)) * 19);
+
   return {
     score,
     checks,
     status: score >= thresholds.ready ? "ready" : score >= thresholds.review ? "review" : "improving",
+    diversityScore,
   };
 }
 
@@ -886,6 +1122,7 @@ export type ApprovedAdContent = {
     portal?: string;
   };
   hashtags?: string[];
+  variationStyle?: string;
 };
 
 export function parseBhk(propertyType?: string, text?: string): string {
@@ -927,13 +1164,17 @@ export function buildDraftAdContent(
   direction: Direction,
   override?: CopyOverride | null,
   brandName?: string,
-  presetId = "luxury-property"
+  presetId = "luxury-property",
+  variationSettings?: VariationSettings,
+  variationStyle?: string
 ): ApprovedAdContent {
   const devAndProj = {
     developer: (brandName?.trim() || brief.name.split(" ")[0] || "EXCLUSIVE").toUpperCase(),
     project: brief.name.toUpperCase(),
   };
   const bhk = parseBhk(brief.propertyType, brief.description);
+  const selectedStyle = variationStyle || variationSettings?.preferredTranscriptStyles?.[0] || "cinematic";
+
   const presetCtas: Record<string, string> = {
     "luxury-property": "Explore Residences",
     "project-launch": "Register Interest",
@@ -946,19 +1187,40 @@ export function buildDraftAdContent(
     "construction-progress": "View Project Progress",
     "location-highlight": "Explore the Location",
   };
-  const presetTaglines: Record<string, string> = {
-    "luxury-property": "A considered address, designed for living",
-    "project-launch": "Discover a new address",
-    "new-phase-launch": "Discover the next chapter",
-    "property-sale": "Find your next home",
-    rental: "Find a place that feels like yours",
-    investment: "Explore the opportunity",
-    "open-house": "Experience the property in person",
-    "festival-offer": "Explore the current offer",
-    "construction-progress": "See the progress for yourself",
-    "location-highlight": "Make this neighbourhood yours",
+
+  const styleTaglines: Record<string, Record<string, string>> = {
+    cinematic: {
+      "luxury-property": "Where natural stillness meets soaring architecture",
+      "project-launch": "A sculptural arrival on the horizon",
+      investment: "Where capital growth converges with timeless design",
+      default: "An address crafted around light, space, and stillness",
+    },
+    investment: {
+      "luxury-property": "High-yield luxury footprint in a prime corridor",
+      "project-launch": "First-mover advantage in a flagship development",
+      investment: "Strategic capital growth in a high-demand market",
+      default: "Exceptional real estate capital appreciation",
+    },
+    lifestyle: {
+      "luxury-property": "Space for life to unfold with grace and calm",
+      "project-launch": "A fresh chapter of family living begins",
+      investment: "Enduring family legacy meets capital stability",
+      default: "A sanctuary crafted for multi-generational living",
+    },
+    launch: {
+      "luxury-property": "The inaugural collection is now officially open",
+      "project-launch": "Introducing the defining residential launch of the year",
+      investment: "Inaugural phase allocations now available",
+      default: "A new benchmark for luxury living has arrived",
+    },
   };
-  const tagline = override?.heroSubline || presetTaglines[presetId] || "Discover this address";
+
+  const fallbackTagline =
+    styleTaglines[selectedStyle]?.[presetId] ||
+    styleTaglines[selectedStyle]?.default ||
+    "A considered address, designed for living";
+
+  const tagline = override?.heroSubline || fallbackTagline;
   const propertyType = brief.propertyType
     .replace(/\b\d+(?:\s*[,/&]\s*\d+)*\s*BHK\b/i, "")
     .replace(/^[\s,/&-]+|[\s,/&-]+$/g, "")
@@ -970,9 +1232,19 @@ export function buildDraftAdContent(
   const archDetail = dna.architecture;
   const verifiedAmenities = dna.usps.length ? `featuring confirmed amenities: ${dna.usps.slice(0, 3).join(", ")}` : "";
   const descContext = brief.description ? `Architectural cues: ${brief.description.slice(0, 160)}.` : "";
+
+  const stylePromptCues: Record<string, string> = {
+    cinematic: `Captured during warm golden hour sunset with champagne reflections across floor-to-ceiling glass and tranquil infinity water features. Designed in ${archDetail} with sculptural volumetric lines.`,
+    investment: `Confident low-angle architectural portrait emphasizing soaring facade height, sleek vertical louvers, and landmark presence in the surrounding corridor. Designed in ${archDetail}.`,
+    lifestyle: `Ground-level tranquil perspective featuring arrival courtyard, lush biophilic landscaping, and warm interior lighting bounce through double-height windows. Designed in ${archDetail}.`,
+    launch: `Striking twilight dusk facade reveal with dramatic illuminated architectural features, warm interior bounce, and ambient blue-hour sky. Designed in ${archDetail}.`,
+  };
+
+  const selectedPromptCue = stylePromptCues[selectedStyle] || stylePromptCues.cinematic;
+
   const imagePrompt =
     override?.imagePrompt ||
-    `Photorealistic architectural photography of ${brief.name}, ${brief.propertyType} in ${brief.location}. Designed in ${archDetail}. ${descContext} ${verifiedAmenities}. Captured during ${dna.lighting.toLowerCase()} with ${direction.grade.toLowerCase()}, highlighting authentic structural lines, rich facade textures, and natural glass reflections. Building anchored in the lower 60% of the frame with clean, uncluttered open sky in the upper 40% reserved for headline typography. Premium architectural advertising standard, realistic environmental depth, strictly no text, no logos, no watermarks.`;
+    `Photorealistic architectural photography of ${brief.name}, ${brief.propertyType} in ${brief.location}. ${selectedPromptCue} ${descContext} ${verifiedAmenities}. Building anchored in the lower 60% of the frame with clean, uncluttered open sky in the upper 40% reserved for headline typography. Premium architectural advertising standard, realistic environmental depth, strictly no text, no logos, no watermarks.`;
 
   return {
     developer: devAndProj.developer,
@@ -988,6 +1260,7 @@ export function buildDraftAdContent(
     designStyle: "editorial",
     captions: override?.captions,
     hashtags: override?.hashtags,
+    variationStyle: selectedStyle,
   };
 }
 
@@ -1008,10 +1281,10 @@ export type ComposeInput = {
 
 export function composeAssets(input: ComposeInput): NewAsset[] {
   const { brief, dna, presetId, platformIds, direction, images, thresholds } = input;
-  const copy = presetCopy(presetId, brief, dna);
-  const ov = input.override ?? null;
   const ac = input.approvedContent ?? null;
   const variant = input.variant ?? 0;
+  const copy = presetCopy(presetId, brief, dna, ac?.variationStyle, variant);
+  const ov = input.override ?? null;
   const out: NewAsset[] = [];
   const heroLine = ac?.tagline ?? (ov?.heroHeadline ?? copy.hero);
   const heroSub = ac ? `${ac.bhk} · ${ac.locationTag}` : (ov?.heroSubline ?? copy.sub);
@@ -1144,7 +1417,7 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
         case "reel": {
           const shots = ov?.storyboard?.length
             ? fitStoryboardDuration(ov.storyboard, platform === "yt-short" ? 30 : 15)
-            : storyboardFor(brief, dna, copy, direction, images, platform === "yt-short");
+            : storyboardFor(brief, dna, copy, direction, images, platform === "yt-short", ac?.variationStyle || "cinematic");
           push(platform, kind, {
             ...base,
             headline: heroLine,

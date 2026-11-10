@@ -161,6 +161,63 @@ export const DEFAULT_BRAND_TYPOGRAPHY: BrandTypographyDefaults = {
   },
 };
 
+export type VariationIntensity = "subtle" | "balanced" | "dynamic";
+
+export type VisualPerspective =
+  | "hero-facade"
+  | "twilight-glow"
+  | "aerial-overview"
+  | "terrace-sanctuary"
+  | "macro-reflection";
+
+export type TranscriptStyle =
+  | "cinematic"
+  | "investment"
+  | "lifestyle"
+  | "launch";
+
+export const VISUAL_PERSPECTIVE_OPTIONS: { id: VisualPerspective; label: string; desc: string }[] = [
+  { id: "hero-facade", label: "Hero Facade", desc: "Low-angle architectural elevation & grand portal" },
+  { id: "twilight-glow", label: "Twilight & Evening", desc: "Warm interior illumination & blue-hour sky" },
+  { id: "aerial-overview", label: "Aerial & Drone", desc: "Elevated vista showing estate grounds & canopy" },
+  { id: "terrace-sanctuary", label: "Terrace & Balcony", desc: "Double-height living, private decks & views" },
+  { id: "macro-reflection", label: "Water & Textures", desc: "Pool reflections, stone, titanium & glass fins" },
+];
+
+export const TRANSCRIPT_STYLE_OPTIONS: { id: TranscriptStyle; label: string; desc: string }[] = [
+  { id: "cinematic", label: "Cinematic & Poetic", desc: "Atmospheric, sensory, timeless architectural elegance" },
+  { id: "investment", label: "Strategic & Investor ROI", desc: "High-yield, capital growth corridor & prime assets" },
+  { id: "lifestyle", label: "Warm Family Haven", desc: "Multi-generational living, calm routines & community" },
+  { id: "launch", label: "Bold Launch & Urgency", desc: "Momentous arrival, phase releases & limited allocations" },
+];
+
+export type VariationSettings = {
+  intensity: VariationIntensity;
+  allowedPerspectives: VisualPerspective[];
+  preferredTranscriptStyles: TranscriptStyle[];
+  autoDiversifyAspects: boolean;
+  diversityThreshold: number;
+};
+
+export const DEFAULT_VARIATION_SETTINGS: VariationSettings = {
+  intensity: "balanced",
+  allowedPerspectives: [
+    "hero-facade",
+    "twilight-glow",
+    "aerial-overview",
+    "terrace-sanctuary",
+    "macro-reflection",
+  ],
+  preferredTranscriptStyles: [
+    "cinematic",
+    "investment",
+    "lifestyle",
+    "launch",
+  ],
+  autoDiversifyAspects: true,
+  diversityThreshold: 85,
+};
+
 export type BrandSettings = {
   name: string;
   mark: string;
@@ -168,7 +225,8 @@ export type BrandSettings = {
   domain: string;
   tones: string[];
   typographyDefaults: BrandTypographyDefaults;
-  thresholds: { ready: number; review: number };
+  variationSettings: VariationSettings;
+  thresholds: { ready: number; review: number; diversity?: number };
 };
 
 export const DEFAULT_BRAND: BrandSettings = {
@@ -178,6 +236,7 @@ export const DEFAULT_BRAND: BrandSettings = {
   domain: "",
   tones: ["Elegant", "Trustworthy"],
   typographyDefaults: DEFAULT_BRAND_TYPOGRAPHY,
+  variationSettings: DEFAULT_VARIATION_SETTINGS,
   thresholds: DEFAULT_THRESHOLDS,
 };
 
@@ -197,13 +256,30 @@ export function mergeBrandSettings(value: Partial<BrandSettings> = {}): BrandSet
     }
   }
 
+  const rawVar = value.variationSettings;
+  const variationSettings: VariationSettings = {
+    intensity: rawVar?.intensity === "subtle" || rawVar?.intensity === "dynamic" ? rawVar.intensity : "balanced",
+    allowedPerspectives: Array.isArray(rawVar?.allowedPerspectives) && rawVar.allowedPerspectives.length > 0
+      ? rawVar.allowedPerspectives.filter((p): p is VisualPerspective => VISUAL_PERSPECTIVE_OPTIONS.some((opt) => opt.id === p))
+      : DEFAULT_VARIATION_SETTINGS.allowedPerspectives,
+    preferredTranscriptStyles: Array.isArray(rawVar?.preferredTranscriptStyles) && rawVar.preferredTranscriptStyles.length > 0
+      ? rawVar.preferredTranscriptStyles.filter((s): s is TranscriptStyle => TRANSCRIPT_STYLE_OPTIONS.some((opt) => opt.id === s))
+      : DEFAULT_VARIATION_SETTINGS.preferredTranscriptStyles,
+    autoDiversifyAspects: typeof rawVar?.autoDiversifyAspects === "boolean" ? rawVar.autoDiversifyAspects : true,
+    diversityThreshold: typeof rawVar?.diversityThreshold === "number"
+      ? Math.min(99, Math.max(70, rawVar.diversityThreshold))
+      : DEFAULT_VARIATION_SETTINGS.diversityThreshold,
+  };
+
   return {
     ...DEFAULT_BRAND,
     ...value,
     typographyDefaults: { fontSizes, fontColors },
+    variationSettings,
     thresholds: {
       ...DEFAULT_BRAND.thresholds,
       ...value.thresholds,
+      diversity: variationSettings.diversityThreshold,
     },
   };
 }
@@ -220,6 +296,9 @@ export const QC_CHECKLIST = [
   "No unwanted objects",
   "No distorted architecture",
   "No incorrect property claims",
+  "Visual perspective diversity",
+  "Narrative transcript freshness",
+  "Aspect-ratio composition tailoring",
 ];
 
 export const SAMPLE_SHOTS: { url: string; label: string; set: string }[] = [
