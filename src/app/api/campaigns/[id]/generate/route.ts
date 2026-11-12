@@ -65,6 +65,8 @@ async function tryAIImagePipeline({
   requestedModel,
   referenceWebsite,
   campaignId,
+  variationStyle,
+  variationSeed,
 }: {
   brief: Brief;
   dna: NonNullable<
@@ -75,13 +77,15 @@ async function tryAIImagePipeline({
   brand: BrandSettings;
   platformIds: string[];
   presetId: string;
-  thresholds: { ready: number; review: number };
+  thresholds: { ready: number; review: number; diversity?: number };
   override: Parameters<typeof composeAssets>[0]["override"];
   approvedContent?: ApprovedAdContent | null;
   enabledKinds: string[] | undefined;
   requestedModel: string | null;
   referenceWebsite?: string;
   campaignId: string;
+  variationStyle: string;
+  variationSeed: string;
 }): Promise<NewAsset[]> {
   try {
     const visualKindsFor = (platform: string) => {
@@ -100,7 +104,7 @@ async function tryAIImagePipeline({
       reel:      ["Exterior"],
     };
 
-    const platformResults = await Promise.allSettled(platformIds.map(async (platform) => {
+    const platformResults = await Promise.allSettled(platformIds.map(async (platform, variationIndex) => {
       const visualKinds = visualKindsFor(platform);
       const platformSpec = platformById(platform);
       const promptContext: ImagePromptContext = {
@@ -113,6 +117,10 @@ async function tryAIImagePipeline({
         approvedImagePrompt: approvedContent?.imagePrompt?.trim(),
         referenceWebsite,
         campaignId,
+        variationSettings: brand.variationSettings,
+        variationStyle,
+        variationSeed,
+        variationIndex,
       };
       console.log(`[ai-pipeline] Writing ${platformSpec.aspect} prompts for kinds:`, visualKinds);
       const { prompts, model: promptModel, fallback: promptFallback } = await writeImagePrompts(
@@ -160,6 +168,7 @@ async function tryAIImagePipeline({
         thresholds,
         override,
         approvedContent,
+        variationStyle,
         typographyDefaults: brand.typographyDefaults,
         enabledKinds,
         variant: 10,
@@ -208,6 +217,7 @@ async function tryAIImagePipeline({
       thresholds,
       override,
       approvedContent,
+      variationStyle,
       typographyDefaults: brand.typographyDefaults,
       enabledKinds,
     }).find((asset) => asset.kind === "copy");
@@ -279,9 +289,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       null
     );
     const submittedContent = body.approvedContent ?? preparedContent;
+    const variationSeed = submittedContent?.variationSeed || crypto.randomUUID();
+    const preferredStyles = brand.variationSettings.preferredTranscriptStyles;
+    const variationStyle = submittedContent?.variationStyle && preferredStyles.includes(
+      submittedContent.variationStyle as (typeof preferredStyles)[number]
+    )
+      ? submittedContent.variationStyle
+      : preferredStyles[hx(`${id}:${variationSeed}`) % preferredStyles.length] || "cinematic";
     const approvedContent = submittedContent
       ? {
           ...submittedContent,
+          variationStyle,
+          variationSeed,
           fontSizes: resolveTypographyValues(
             submittedContent.fontSizes,
             preparedContent?.fontSizes,
@@ -311,7 +330,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         requestedModel,
         templateInstructions,
         direction,
-        { name: brand.name, color: brand.color, tones: brand.tones }
+        { name: brand.name, color: brand.color, tones: brand.tones },
+        brand.variationSettings,
+        variationStyle,
+        variationSeed
       );
       override = llmResult.override;
       model = llmResult.model;
@@ -328,7 +350,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       process.env.AGNES_MODEL?.trim().toLowerCase() ||
       process.env.IMAGE_MODEL?.trim().toLowerCase() ||
       (process.env.AGNES_API_KEY?.trim() ? "agnes-image-2.1-flash" : "black-forest-labs/FLUX.1-schnell:free");
-    console.log(`[generate] Generating campaign-specific architecture with configured model: ${imageModel}`);
+    console.log(`[generate] Generating campaign-specific ad images with configured model: ${imageModel}`);
     const composed = await tryAIImagePipeline({
       brief,
       dna: bundle.dna as NonNullable<typeof bundle.dna>,
@@ -343,6 +365,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       requestedModel,
       referenceWebsite: p.sourceUrl,
       campaignId: id,
+      variationStyle,
+      variationSeed,
     });
 
     /* ---- Persist assets (unchanged logic) ---- */

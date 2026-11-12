@@ -13,7 +13,12 @@
  * ------------------------------------------------------------------ */
 
 import type { Brief, DNA, Direction } from "./engine";
-import { presetById } from "./presets";
+import {
+  DEFAULT_VARIATION_SETTINGS,
+  presetById,
+  type VariationSettings,
+  type VisualPerspective,
+} from "./presets";
 
 export type ImagePromptSet = Record<string, string>; // kind → prompt
 export type ImagePromptContext = {
@@ -26,22 +31,34 @@ export type ImagePromptContext = {
   approvedImagePrompt?: string;
   referenceWebsite?: string;
   campaignId?: string;
+  variationSettings?: VariationSettings;
+  variationStyle?: string;
+  variationSeed?: string;
+  variationIndex?: number;
 };
 
 function aspectComposition(aspectRatio?: string): string {
   switch (aspectRatio) {
     case "9:16":
-      return "vertical 9:16 portrait framing, building in the lower-middle 60%, clean upper 35% for headline and uncluttered bottom 12% for the white CTA ribbon";
+      return "vertical 9:16 architectural composition emphasizing the verified facade and proportions, property occupying the lower-middle 60%, pristine upper 38% reserved for typography, clean lower 12% for the white CTA ribbon";
     case "1:1":
-      return "square 1:1 composition, building centred in the lower 60%, clean open upper 35% and clear bottom edge for overlaid copy and CTA";
+      return "balanced square 1:1 architectural portrait using the verified facade or entrance, building centred in the lower 60%, clean open upper 35% negative space for the headline";
     case "4:5":
-      return "portrait 4:5 composition, building anchored in the lower-middle 60%, clean upper 35% and bottom edge reserved for overlaid copy and CTA";
+      return "portrait 4:5 three-quarter architectural perspective that preserves the verified facade, lower-middle 60% property anchor, clean upper 35% sky or neutral space for copy";
     case "16:9":
-      return "wide 16:9 advertising composition, property weighted to the right half with uncluttered visual space on the left and a clean lower edge for the CTA ribbon";
+      return "cinematic 16:9 wide-angle composition, property contextualized only within its verified setting, negative space distributed across the upper-left for titles and a clean lower-right";
+    case "4:3":
+      return "classic 4:3 architectural editorial that preserves the property's real proportions, with clean upper 35% negative space for the brand header";
+    case "3:2":
+      return "horizontal 3:2 medium-telephoto architectural view, crisp verified structural lines, upper 35% negative space";
+    case "2:3":
+      return "editorial 2:3 vertical composition focused on the verified facade and materials, with clean upper 35% sky or neutral space";
+    case "21:9":
+      return "ultra-wide 21:9 cinematic vista, expansive horizon and verified property setting, structural composition weighted to the right";
     default:
       return aspectRatio
-        ? `compose for the exact ${aspectRatio} advertising aspect ratio, keep the property prominent and preserve uncluttered negative space for overlaid copy and CTA`
-        : "compose with the property prominent and preserve uncluttered negative space for overlaid copy and CTA";
+        ? `compose for the exact ${aspectRatio} advertising aspect ratio, keep the property prominent and preserve uncluttered negative space in upper 35-40% for overlaid copy and CTA`
+        : "compose with the property prominent and preserve uncluttered negative space in upper 35-40% for overlaid copy and CTA";
   }
 }
 
@@ -53,34 +70,133 @@ function getReferenceWebsite(context?: ImagePromptContext): string | undefined {
     ?.replace(/[),.;!?]+$/, "");
 }
 
-function campaignArchitectureVariation(campaignId?: string): string | undefined {
-  if (!campaignId?.trim()) return undefined;
-  const key = campaignId.trim();
-  const hash = (value: string) => {
-    let result = 2166136261;
-    for (let index = 0; index < value.length; index++) {
-      result = Math.imul(result ^ value.charCodeAt(index), 16777619);
-    }
-    return result >>> 0;
-  };
-  const choose = (dimension: string, options: string[]) =>
-    options[hash(`${key}:${dimension}`) % options.length];
+const PERSPECTIVE_GUIDES: Record<VisualPerspective, string> = {
+  "hero-facade":
+    "photograph the verified facade from a confident low three-quarter viewpoint, emphasizing its real proportions and entrance",
+  "twilight-glow":
+    "use a blue-hour viewpoint with natural ambient light and balanced detail in the verified facade and shadows",
+  "aerial-overview":
+    "use an elevated oblique establishing viewpoint to show the property's verified setting without adding unconfirmed surroundings",
+  "terrace-sanctuary":
+    "use a calm eye-level viewpoint from a confirmed terrace or balcony; if none is described, frame the verified facade at eye level instead",
+  "macro-reflection":
+    "use a close architectural detail of confirmed materials or a confirmed water feature; do not add pools or materials absent from the property facts",
+};
 
-  return [
-    `campaign design variation ${hash(key).toString(36)}`,
-    `building massing: ${choose("massing", ["stepped interlocking volumes", "slender tower with a sculpted podium", "paired wings around a central void", "offset vertical blocks with recessed terraces", "broad horizontal terraces rising to a compact crown"])}`,
-    `facade: ${choose("facade", ["deeply framed balcony bays", "alternating solid and glazed vertical fins", "layered screens with inset window bands", "projecting geometric frames around recessed glazing", "a regular structural grid with varied recessed panels"])}`,
-    `balconies: ${choose("balconies", ["stacked loggias with varied setbacks", "alternating cantilevered balcony boxes", "continuous planted terrace bands", "recessed corner balconies with solid side screens", "slim balconies integrated into deep facade frames"])}`,
-    `roofline: ${choose("roofline", ["a clean flat crown with a strong parapet", "a stepped crown with a recessed top-floor terrace", "a slim rooftop pergola profile", "a distinctive split-height roof silhouette"])}`,
-    "Design a genuinely new building form for this campaign; do not reproduce an uploaded exterior photo or reuse the same facade silhouette from another campaign. Keep the supplied property facts and requested material palette, but treat the architectural composition above as mandatory.",
-  ].join("; ");
+const PHOTO_MOMENTS: Record<string, string[]> = {
+  cinematic: [
+    "capture warm late-afternoon sidelight with restrained highlights and visible facade detail",
+    "capture the transition into blue hour with the facade and ambient sky both clearly exposed",
+    "capture a calm, softly lit architectural moment with gentle reflections and open shadows",
+  ],
+  investment: [
+    "capture clear daylight that reveals the verified facade and surrounding context without exaggeration",
+    "capture a crisp morning moment with neutral materials and well-defined architectural lines",
+    "capture a softly overcast daylight moment with even exposure and open shadows",
+  ],
+  lifestyle: [
+    "capture a bright, gentle morning moment with soft natural light and relaxed residential warmth",
+    "capture late-afternoon light falling softly across the verified living spaces and facade",
+    "capture an airy daylight moment with natural color and calm, open shadows",
+  ],
+  launch: [
+    "capture a dramatic but realistic twilight reveal with the facade and ambient sky clearly exposed",
+    "capture a crisp daylight hero moment with clean architectural detail",
+    "capture warm late-afternoon sidelight for a confident, polished launch image",
+  ],
+};
+
+const KIND_ORDER = ["hero", "feature", "location", "offer", "lifestyle", "story", "reel"];
+
+const CAMERA_TREATMENTS = [
+  "a centered, straight-on eye-level architectural view with precise vertical lines",
+  "a low three-quarter corner view that reveals the facade's depth and entrance",
+  "an elevated oblique view that shows only the verified building and its confirmed setting",
+  "an asymmetrical medium-wide view with the property weighted to one side and clean overlay-safe space",
+  "a restrained telephoto view compressing the facade's layers while keeping the property recognizable",
+  "a wide establishing view with corrected verticals and generous environmental context",
+];
+
+const EXTERIOR_IMAGE_PROMPT_VARIATIONS = [
+  "Create a formal, symmetrical front elevation in clear neutral daylight, emphasizing the verified facade and precise architectural lines.",
+  "Create a dramatic low three-quarter view in warm late-afternoon sidelight, showing the verified building's depth without distorting its proportions.",
+  "Create a refined blue-hour architectural portrait with a natural dusk sky and realistic exposure; do not add lights or illuminated features not present in the property.",
+  "Create an elevated oblique establishing view of the verified building and only its confirmed surroundings; do not invent roads, landmarks, or amenities.",
+  "Create an eye-level approach toward the verified main entrance, using a close but recognizable architectural frame and straight vertical lines.",
+  "Create a restrained telephoto composition that compresses the verified facade's structural layers and material transitions.",
+  "Create a wide environmental view with the property prominent but not filling the frame, using only the property's confirmed setting.",
+  "Create a softly overcast architectural study with even exposure, natural material color, and crisp facade detail.",
+];
+
+const INTERIOR_IMAGE_PROMPT_VARIATIONS = [
+  "Create an illustrative residential living-room interior with natural window light, restrained furnishings, and a neutral palette coherent with the verified architecture; do not imply unconfirmed views, amenities, or distinctive finishes.",
+  "Create an eye-level open-plan living and dining interior with layered depth and calm natural light; keep the design plausible and avoid unsupported fixtures, materials, or amenities.",
+  "Create a kitchen-to-living interior composition with clean architectural lines and understated cabinetry; treat unspecified details as a neutral visualization, not verified property features.",
+  "Create a restful residential bedroom interior with soft daylight and simple textures; do not invent a balcony, view, premium fittings, or other unverified features.",
+];
+
+const IMAGE_PROMPT_VARIATIONS = [
+  ...EXTERIOR_IMAGE_PROMPT_VARIATIONS,
+  ...INTERIOR_IMAGE_PROMPT_VARIATIONS,
+];
+
+function variationHash(value: string): number {
+  let result = 2166136261;
+  for (let index = 0; index < value.length; index++) {
+    result = Math.imul(result ^ value.charCodeAt(index), 16777619);
+  }
+  return result >>> 0;
+}
+
+export function selectImagePromptVariation(seed: string, variationIndex = 0): string {
+  const start = variationHash(seed) % IMAGE_PROMPT_VARIATIONS.length;
+  const offset = ((variationIndex % IMAGE_PROMPT_VARIATIONS.length) + IMAGE_PROMPT_VARIATIONS.length) %
+    IMAGE_PROMPT_VARIATIONS.length;
+  return IMAGE_PROMPT_VARIATIONS[(start + offset) % IMAGE_PROMPT_VARIATIONS.length];
+}
+
+function selectedPromptVariation(context?: ImagePromptContext, kind = ""): string {
+  const seed = context?.variationSeed || context?.campaignId || "creative";
+  const autoDiversify = context?.variationSettings?.autoDiversifyAspects !== false;
+  const kindIndex = Math.max(0, KIND_ORDER.indexOf(kind));
+  const variationIndex = kindIndex + (autoDiversify ? (context?.variationIndex ?? 0) * KIND_ORDER.length : 0);
+  const isInteriorSlot = kind === "feature" ||
+    (autoDiversify && variationIndex % 3 === 1) ||
+    (variationIndex === 0 && variationHash(`${seed}:interior`) % 3 === 0);
+  const options = isInteriorSlot ? INTERIOR_IMAGE_PROMPT_VARIATIONS : EXTERIOR_IMAGE_PROMPT_VARIATIONS;
+  const selection = variationHash(`${seed}:${variationIndex}`) % options.length;
+  return options[selection];
+}
+
+function selectedVisualVariation(context?: ImagePromptContext, kind = ""): string {
+  const allowed = context?.variationSettings?.allowedPerspectives?.length
+    ? context.variationSettings.allowedPerspectives
+    : DEFAULT_VARIATION_SETTINGS.allowedPerspectives;
+  const seed = context?.variationSeed || context?.campaignId || "creative";
+  const autoDiversify = context?.variationSettings?.autoDiversifyAspects !== false;
+  const formatKey = autoDiversify
+    ? `:${context?.aspectRatio || "default"}:${context?.platform || ""}`
+    : "";
+  const key = `${seed}${formatKey}`;
+  const kindIndex = Math.max(0, KIND_ORDER.indexOf(kind));
+  const visualIndex = kindIndex + (autoDiversify ? (context?.variationIndex ?? 0) * KIND_ORDER.length : 0);
+  const perspective = allowed[(variationHash(key) + visualIndex) % allowed.length];
+  const photoMoments = PHOTO_MOMENTS[context?.variationStyle ?? "cinematic"] ?? PHOTO_MOMENTS.cinematic;
+  const photoMoment = photoMoments[(variationHash(`${key}:moment`) + visualIndex) % photoMoments.length];
+  const camera = CAMERA_TREATMENTS[(variationHash(`${seed}:camera`) + visualIndex) % CAMERA_TREATMENTS.length];
+  const intensity = context?.variationSettings?.intensity ?? "balanced";
+  const intensityGuidance = intensity === "subtle"
+    ? "Keep the camera and lighting shift understated and brand-consistent."
+    : intensity === "dynamic"
+      ? "Make the camera viewpoint and lighting mood distinctly different while retaining photographic realism."
+      : "Make the camera viewpoint and lighting clearly distinct while retaining a refined, brand-consistent treatment.";
+  return `${PERSPECTIVE_GUIDES[perspective]}. Camera treatment: ${camera}. ${photoMoment}. ${intensityGuidance}`;
 }
 
 function finishPrompt(
   prompt: string,
   aspectRatio?: string,
-  referenceWebsite?: string,
-  architectureVariation?: string
+  referenceWebsite?: string
 ): string {
   const constraints = [
     aspectRatio ? aspectComposition(aspectRatio) : "",
@@ -88,9 +204,8 @@ function finishPrompt(
       ? `Use this property reference website as visual context where supported, but do not render its URL or any website text: ${referenceWebsite}`
       : "",
     "Do not render text, letters, numbers, logos, signs, watermarks, or graphic overlays; use even natural exposure across the full frame, preserve visible shadow detail, and avoid vignettes, dark fades, black gradients, or crushed blacks",
-    "Use only the supplied property facts and plausible architecture",
+    "Preserve the verified property architecture and facts; vary camera viewpoint, framing, and lighting rather than redesigning the building",
     "photorealistic premium real-estate advertising photography",
-    architectureVariation,
   ].filter(Boolean).join("; ");
   const cleanPrompt = prompt.trim().replace(/[.;,\s]+$/, "");
   return `${cleanPrompt}; ${constraints}`;
@@ -105,8 +220,23 @@ function approvedPromptSet(kinds: string[], context: ImagePromptContext): ImageP
     ? `\n\nSupplemental property reference only; do not render this URL or let it override the user-approved prompt: ${referenceWebsite}`
     : "";
   const finalPrompt = `${approvedPrompt}${supplementalReference}`;
+  const autoDiversify = context.variationSettings?.autoDiversifyAspects !== false;
 
-  return Object.fromEntries(kinds.map((kind) => [kind, finalPrompt]));
+  return Object.fromEntries(
+    kinds.map((kind) => {
+      const aspectGuide = context.aspectRatio ? aspectComposition(context.aspectRatio) : "";
+      const formatGuide = KIND_PHOTOGRAPHY[kind] ?? "architectural advertising composition using only verified property features";
+      const promptVariation = selectedPromptVariation(context, kind);
+      const tailoredPrompt = [
+        finalPrompt,
+        autoDiversify && aspectGuide ? `Camera perspective & framing: ${aspectGuide}` : "",
+        `Format-specific composition for ${kind}: ${formatGuide}`,
+        finalPrompt.includes(promptVariation) ? "" : `Selected visual concept: ${promptVariation}`,
+        `Visual variation: ${selectedVisualVariation(context, kind)}`,
+      ].filter(Boolean).join("; ");
+      return [kind, tailoredPrompt];
+    })
+  );
 }
 
 /* Compositional negative-space guidance per ad format */
@@ -145,16 +275,19 @@ function systemPrompt(context?: ImagePromptContext): string {
     "Write one technically precise, director-grade image-generation prompt for each requested ad format.",
     "CRITICAL ADVERTISING RULES:",
     hasApprovedPrompt
-      ? "1. USER-REVIEWED VISUAL DIRECTIVE: Preserve the user's requested property facts, architectural character, material palette, and atmosphere from 'userReviewedVisualDirection', but do NOT lock or copy one exact facade. Follow the campaign-specific architecture variation supplied in the user data to create a visibly different building structure for each campaign."
-      : "1. ARCHITECTURAL AUTHENTICITY: Use the property's verified facts, but follow the campaign-specific architecture variation supplied in the user data. Create a visibly different building structure for each campaign instead of repeating a generic or previously used facade.",
+      ? "1. USER-REVIEWED VISUAL DIRECTIVE: Preserve the user's requested property facts, verified architectural character, material palette, and atmosphere from 'userReviewedVisualDirection'."
+      : "1. ARCHITECTURAL AUTHENTICITY: Preserve the property's verified facts, architectural style, facade, and proportions. Do not redesign the property.",
+    "When an interior concept is selected for a residential property, generate an interior view rather than defaulting to the facade; use confirmed details where available and keep unspecified finishes neutral and illustrative.",
     "2. COMPOSITION & SAFE ZONES: Follow the exact aspect-ratio composition instructions. Reserve clear, uncluttered negative space (clean sky/ambient space in the upper 35-40%) for the separately rendered ad copy; keep the property visible and undistorted.",
     "3. BRAND AND CAMPAIGN FIT: Reflect the supplied company identity, campaign objective, selected creative direction, verified palette, and lighting without adding logos or text.",
     "4. CLEAN CANVAS: Never generate text, typography, words, numbers, logos, banners, watermarks, or UI elements.",
     "5. DENSITY & DETAIL: Comprehensive, unconstrained photographic brief with specific camera, lighting, material, composition, and color-grade direction without word or character count limits.",
     "6. OUTPUT: Return strictly one valid JSON object mapping each requested kind key to a prompt string. No markdown fences or explanation.",
     "When a reference website URL is supplied, include it verbatim in each final image prompt as visual reference context; do not claim to have opened or inspected the website, and never render the URL as image text.",
-    "Create a distinct camera angle, framing, or photographic moment for each requested ad format while preserving the same verified property identity.",
-    "Treat campaignArchitectureVariation as a required design brief: change the building's massing, facade articulation, balcony geometry, and roofline for this campaign. Do not merely change camera angle, crop, or lighting to simulate a new design.",
+    context?.variationSettings?.autoDiversifyAspects === false
+      ? "Keep the same camera viewpoint and photographic moment across aspect-ratio versions, adapting only the crop and safe zones; vary them between generations while preserving the verified property identity."
+      : "Give every requested ad format its own clearly distinct camera treatment, framing, and photographic moment; do not reuse one visual direction across formats. Preserve the same verified property identity.",
+    "Follow the selected image-prompt variation supplied for each format as a real photographic direction, not merely as inspiration; do not add unverified property features.",
     context?.brandName ? `Company: ${context.brandName}.` : "",
     context?.brandColor ? `Brand color accent: ${context.brandColor}.` : "",
     context?.brandTones?.length ? `Brand voice: ${context.brandTones.join(", ")}.` : "",
@@ -189,7 +322,6 @@ function userPrompt(brief: Brief, dna: DNA, direction: Direction, kinds: string[
       audience: dna.audience,
     },
     referenceWebsite: getReferenceWebsite(context),
-    campaignArchitectureVariation: campaignArchitectureVariation(context?.campaignId),
     campaign: preset ? { preset: preset.label, objective: preset.objective } : undefined,
     brandToneAndColorGrade: {
       directionName: direction.name,
@@ -202,13 +334,27 @@ function userPrompt(brief: Brief, dna: DNA, direction: Direction, kinds: string[
       aspectRatio: context?.aspectRatio,
       composition: aspectComposition(context?.aspectRatio),
     },
+    variationDirectives: {
+      intensity: context?.variationSettings?.intensity || "balanced",
+      allowedPerspectives: context?.variationSettings?.allowedPerspectives,
+      preferredTranscriptStyles: context?.variationSettings?.preferredTranscriptStyles,
+      customVariationStyle: context?.variationStyle,
+      selectedVisualVariationByFormat: Object.fromEntries(
+        kinds.map((kind) => [kind, selectedVisualVariation(context, kind)])
+      ),
+      selectedImagePromptVariationByFormat: Object.fromEntries(
+        kinds.map((kind) => [kind, selectedPromptVariation(context, kind)])
+      ),
+      variationSeed: context?.variationSeed,
+      compositionAngleForThisAspect: context?.aspectRatio ? aspectComposition(context.aspectRatio) : undefined,
+    },
     adFormatsNeeded: kinds,
     spatialZoningGuidancePerFormat: Object.fromEntries(
       kinds.filter((k) => KIND_PHOTOGRAPHY[k]).map((k) => [k, KIND_PHOTOGRAPHY[k]])
     ),
     instruction: hasApproved
-      ? "The user-reviewed direction defines the property facts, architectural character, finishes, and atmosphere, not a facade to copy exactly. Apply 'campaignArchitectureVariation' as the required new building design for this campaign. Adapt camera framing for each format while keeping the new campaign-specific architecture visually consistent across those formats. Return JSON only."
-      : "Write one unique, technically specific background-photo prompt per format matching the verified architectural style ('projectArchitectureStyle') and project description. Typography and the white CTA ribbon are added by the ad layout, never render them into the image. Return JSON only.",
+      ? "Preserve the user-reviewed property facts, architectural character, finishes, and atmosphere. Apply the corresponding 'selectedVisualVariationByFormat' and 'selectedImagePromptVariationByFormat' through camera viewpoint, framing, and lighting only. Return JSON only."
+      : "Write one technically specific, visually distinct background-photo prompt per format matching the verified architectural style ('projectArchitectureStyle') and project description. Apply each format's 'selectedVisualVariationByFormat' and 'selectedImagePromptVariationByFormat' through camera viewpoint, framing, and lighting; preserve the real property design and materials. Typography and the white CTA ribbon are added by the ad layout, never render them into the image. Return JSON only.",
   });
 }
 
@@ -222,11 +368,11 @@ function parsePromptSet(content: string, kinds: string[], context?: ImagePromptC
     const result: ImagePromptSet = {};
     for (const kind of kinds) {
       if (typeof parsed[kind] === "string" && (parsed[kind] as string).trim()) {
+        const formatGuide = KIND_PHOTOGRAPHY[kind] ?? "architectural advertising composition using only verified property features";
         result[kind] = finishPrompt(
-          (parsed[kind] as string).trim(),
+          `${(parsed[kind] as string).trim()}; format-specific composition for ${kind}: ${formatGuide}; selected visual concept: ${selectedPromptVariation(context, kind)}; distinct visual direction: ${selectedVisualVariation(context, kind)}`,
           context?.aspectRatio,
-          getReferenceWebsite(context),
-          campaignArchitectureVariation(context?.campaignId)
+          getReferenceWebsite(context)
         );
       }
     }
@@ -254,10 +400,9 @@ function localFallbackPrompts(
     for (const kind of kinds) {
       const guide = KIND_PHOTOGRAPHY[kind] ?? "establishing exterior shot with clean negative space in upper third";
       set[kind] = finishPrompt(
-        `${userApproved}; ${aspectComposition(context?.aspectRatio)}; ${guide}; architectural photography preserving verified ${dna.architecture} materials; natural daylight exposure`,
+        `${userApproved}; ${aspectComposition(context?.aspectRatio)}; ${guide}; selected visual concept: ${selectedPromptVariation(context, kind)}; ${selectedVisualVariation(context, kind)}; architectural photography preserving verified ${dna.architecture} materials; natural daylight exposure`,
         context?.aspectRatio,
-        getReferenceWebsite(context),
-        campaignArchitectureVariation(context?.campaignId)
+        getReferenceWebsite(context)
       );
     }
     return set;
@@ -268,10 +413,9 @@ function localFallbackPrompts(
   for (const kind of kinds) {
     const guide = KIND_PHOTOGRAPHY[kind] ?? "establishing exterior shot with clean negative space in upper third";
     set[kind] = finishPrompt(
-      `${base} ${guide}`,
+      `${base} ${guide}. Selected visual concept: ${selectedPromptVariation(context, kind)}. Distinct visual direction: ${selectedVisualVariation(context, kind)}`,
       context?.aspectRatio,
-      getReferenceWebsite(context),
-      campaignArchitectureVariation(context?.campaignId)
+      getReferenceWebsite(context)
     );
   }
   return set;

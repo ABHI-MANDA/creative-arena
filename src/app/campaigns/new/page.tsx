@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, Loader2, Music2, Palette, Sparkles, Wand2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Film, Loader2, Music2, Palette, Shuffle, Sparkles, Wand2 } from "lucide-react";
 import { DEFAULT_BRAND, platformById, PLATFORMS, PRESETS, type BrandSettings } from "@/lib/creative/presets";
 import type { AdTextSection, ApprovedAdContent, AssetPayload, Direction } from "@/lib/creative/engine";
 import { AssetVisual } from "@/components/ad-creative";
@@ -11,6 +11,13 @@ import { DynIcon } from "@/components/ui";
 import { aspectCss, cx, ratioOf } from "@/lib/utils";
 import type { OpenRouterModel } from "@/lib/creative/models";
 import { CREATIVE_DESIGN_STYLES } from "@/lib/creative/style-config";
+
+const VARIATION_STYLES = [
+  { id: "cinematic", label: "Cinematic Atmosphere", icon: "🎬", desc: "Atmospheric, quiet luxury & poetic stillness" },
+  { id: "investment", label: "Investor ROI & Growth", icon: "📈", desc: "High-yield, strategic corridor & capital value" },
+  { id: "lifestyle", label: "Lifestyle Sanctuary", icon: "🌿", desc: "Family haven, lush buffers & community" },
+  { id: "launch", label: "Milestone Launch", icon: "🚀", desc: "Momentous arrival, inaugural release & urgency" },
+];
 
 type PropertyLite = {
   id: string;
@@ -175,18 +182,56 @@ function CampaignWizard() {
     }
   };
 
-  const prepareReview = async () => {
+  const [variationStyle, setVariationStyle] = useState<string>("cinematic");
+
+  const switchVariationStyle = async (newStyle: string) => {
+    setVariationStyle(newStyle);
     setBusy(true);
     setError("");
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/prepare-content`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ directionId: directions[selectedDir]?.id, model: modelSelection }),
+        body: JSON.stringify({
+          directionId: directions[selectedDir]?.id,
+          model: modelSelection,
+          variationStyle: newStyle,
+        }),
+      });
+      const data = (await res.json()) as { ok?: boolean; content?: ApprovedAdContent; error?: string };
+      if (!res.ok || !data.content) throw new Error(data.error ?? "Failed to update variation");
+      setContentDraft(data.content);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to change variation style");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const shuffleVariation = async () => {
+    const candidateStyles = VARIATION_STYLES.map((s) => s.id).filter((s) => s !== variationStyle);
+    const randomStyle = candidateStyles[Math.floor(Math.random() * candidateStyles.length)] ?? "cinematic";
+    await switchVariationStyle(randomStyle);
+  };
+
+  const prepareReview = async (overrideStyle?: unknown) => {
+    setBusy(true);
+    setError("");
+    const targetStyle = typeof overrideStyle === "string" ? overrideStyle : variationStyle;
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/prepare-content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          directionId: directions[selectedDir]?.id,
+          model: modelSelection,
+          variationStyle: targetStyle,
+        }),
       });
       const data = (await res.json()) as { ok?: boolean; content?: ApprovedAdContent; error?: string };
       if (!res.ok || !data.content) throw new Error(data.error ?? "Failed to prepare ad content for review");
       setContentDraft(data.content);
+      if (data.content.variationStyle) setVariationStyle(data.content.variationStyle);
       setStage("review");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to prepare ad content");
@@ -452,6 +497,48 @@ function CampaignWizard() {
           <div className="grid gap-7 lg:grid-cols-12 items-start">
             {/* Left Column: Editable Fields */}
             <div className="lg:col-span-7 space-y-4">
+              {/* Positive Variation & Automated Style Controls */}
+              <div className="panel p-5 space-y-3 border border-line/90 bg-panel/70">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-widest text-gold font-semibold">
+                    <Sparkles size={13} className="text-gold" /> Auto-Variation &amp; Script Style
+                  </span>
+                  <button
+                    type="button"
+                    onClick={shuffleVariation}
+                    disabled={busy}
+                    className="flex items-center gap-1.5 rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold transition-all hover:bg-gold/20"
+                  >
+                    <Shuffle size={12} /> Shuffle Variations
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {VARIATION_STYLES.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => switchVariationStyle(v.id)}
+                      disabled={busy}
+                      className={cx(
+                        "rounded-lg p-2.5 text-left border transition-all text-xs",
+                        variationStyle === v.id
+                          ? "border-gold bg-gold/15 text-cream ring-1 ring-gold/40 shadow-sm"
+                          : "border-line bg-coal/70 text-mute hover:border-gold/40 hover:text-cream"
+                      )}
+                    >
+                      <div className="font-semibold text-[11px] truncate">{v.icon} {v.label}</div>
+                      <div className="text-[9.5px] text-faint line-clamp-1 mt-0.5">{v.desc}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-faint pt-1 border-t border-line/50">
+                  <span className="flex items-center gap-1.5 text-sage">
+                    <Check size={11} /> Multi-angle aspect ratio diversification active
+                  </span>
+                  <span>Automated with minimal input</span>
+                </div>
+              </div>
+
               <div className="panel p-5.5 space-y-4 border border-line/80">
                 <div className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-gold font-semibold flex items-center justify-between">
                   <span>Ad Poster Typography &amp; Copy</span>
@@ -573,7 +660,7 @@ function CampaignWizard() {
                   <span className="text-faint text-[9.5px]">Photographic Brief</span>
                 </div>
                 <p className="text-[11.5px] text-faint">
-                  Edit the visual direction. The image prompt is adapted to your company, campaign preset, verified property details, and each selected aspect ratio. Text and the white CTA ribbon are added separately.
+                  Review or edit the base direction. Twelve seeded concepts include residential interiors; some ads receive an interior view with distinct framing and lighting. Unspecified interiors stay neutral and illustrative, not claims about exact finishes. Text and the white CTA ribbon are added separately.
                 </p>
                 <textarea
                   rows={5}
@@ -583,6 +670,21 @@ function CampaignWizard() {
                   placeholder="Describe the property-focused visual direction. Avoid adding unverified features."
                   aria-label="AI image visual direction"
                 />
+              </div>
+
+              {/* Video Reel Transcript Voiceover */}
+              <div className="panel p-5 space-y-2 border border-line/80 bg-panel/70">
+                <div className="flex items-center justify-between font-mono text-[10.5px] uppercase tracking-widest text-gold font-semibold">
+                  <span className="flex items-center gap-1.5"><Film size={13} /> Video Reel Transcript Voiceover</span>
+                  <span className="text-faint text-[9.5px] capitalize">{variationStyle} narration</span>
+                </div>
+                <div className="rounded-lg border border-line/60 bg-coal/70 p-3 text-[12px] text-cream/90 italic leading-relaxed">
+                  “{contentDraft.tagline}. Rising over {properties.find((p) => p.id === propertyId)?.location || "the location"} — {contentDraft.project}. Crafted for distinguished living. {contentDraft.cta} — reserve your private walkthrough.”
+                </div>
+                <div className="text-[10.5px] text-faint flex items-center justify-between">
+                  <span>Generated from active narrative style</span>
+                  <span className="text-gold">15s / 30s Reel Storyboard Ready</span>
+                </div>
               </div>
 
               {/* Approval Button Bar */}

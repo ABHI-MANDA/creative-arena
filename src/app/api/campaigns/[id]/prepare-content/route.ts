@@ -4,9 +4,11 @@ import {
   analyzeDNA,
   buildDraftAdContent,
   directionsFor,
+  hx,
   tryLLMOverride,
   type Brief,
 } from "@/lib/creative/engine";
+import type { TranscriptStyle } from "@/lib/creative/presets";
 import { DEFAULT_TEMPLATE_LIBRARY, TEMPLATE_LIBRARY_KEY, type TemplateLibrary } from "@/lib/creative/template-library";
 import { isFreeOpenRouterModel, resolveOpenRouterModel } from "@/lib/creative/models";
 import { DEFAULT_SCRIM_SETTINGS } from "@/lib/creative/style-config";
@@ -16,12 +18,28 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const body = (await req.json().catch(() => ({}))) as { directionId?: string; model?: string };
+    const body = (await req.json().catch(() => ({}))) as {
+      directionId?: string;
+      model?: string;
+      variationStyle?: TranscriptStyle;
+      variationSeed?: string;
+    };
     const bundle = await getCampaignBundle(id);
     if (!bundle) return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     if (!bundle.dna) return NextResponse.json({ error: "Run property analysis first." }, { status: 400 });
 
     const brand = await getBrand();
+    if (body.variationSeed !== undefined && (typeof body.variationSeed !== "string" || body.variationSeed.length > 128)) {
+      return NextResponse.json({ error: "Variation seed must be a string of 128 characters or fewer." }, { status: 400 });
+    }
+    if (body.variationStyle && !brand.variationSettings.preferredTranscriptStyles.includes(body.variationStyle)) {
+      return NextResponse.json({ error: "Choose a transcript style enabled in the Brand Kit." }, { status: 400 });
+    }
+    const variationSeed = body.variationSeed || crypto.randomUUID();
+    const preferredStyles = brand.variationSettings.preferredTranscriptStyles;
+    const variationStyle = body.variationStyle ||
+      preferredStyles[hx(`${id}:${variationSeed}`) % preferredStyles.length] ||
+      "cinematic";
     const p = bundle.property;
     const brief: Brief = {
       name: p.name,
@@ -74,7 +92,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       requestedModel,
       templateInstructions,
       direction,
-      { name: brand.name, color: brand.color, tones: brand.tones }
+      { name: brand.name, color: brand.color, tones: brand.tones },
+      brand.variationSettings,
+      variationStyle,
+      variationSeed
     );
     await setAppSetting(`campaign-model-used:${id}`, model);
     const draftContent = buildDraftAdContent(
@@ -83,7 +104,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       direction,
       override,
       brand?.name,
-      bundle.campaign.preset
+      bundle.campaign.preset,
+      brand.variationSettings,
+      variationStyle,
+      variationSeed
     );
     draftContent.fontSizes = brand.typographyDefaults.fontSizes;
     draftContent.fontColors = brand.typographyDefaults.fontColors;
@@ -97,6 +121,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       directionId: direction.id,
       directionName: direction.name,
       model,
+      variationSeed,
+      variationStyles: preferredStyles,
+      autoDiversifyAspects: brand.variationSettings.autoDiversifyAspects,
     });
   } catch (error) {
     console.error("[prepare-content] Failed to draft ad content:", error);

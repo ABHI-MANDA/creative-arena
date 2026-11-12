@@ -1,8 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Loader2, Lock, Palette, ShieldCheck, Type } from "lucide-react";
-import { AD_TEXT_SECTIONS, type AdTextSection, type BrandSettings } from "@/lib/creative/presets";
+import { Check, Eye, Film, Loader2, Lock, Palette, ShieldCheck, Sparkles, Type } from "lucide-react";
+import {
+  AD_TEXT_SECTIONS,
+  TRANSCRIPT_STYLE_OPTIONS,
+  VISUAL_PERSPECTIVE_OPTIONS,
+  type AdTextSection,
+  type BrandSettings,
+  type TranscriptStyle,
+  type VariationIntensity,
+  type VariationSettings,
+  type VisualPerspective,
+} from "@/lib/creative/presets";
 import { AdCreative } from "@/components/ad-creative";
 import { cx } from "@/lib/utils";
 import { DEFAULT_SCRIM_SETTINGS } from "@/lib/creative/style-config";
@@ -18,8 +28,54 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
   const set = <K extends keyof BrandSettings>(k: K, v: BrandSettings[K]) =>
     setBrand((b) => ({ ...b, [k]: v }));
 
+  const setVariation = <K extends keyof VariationSettings>(k: K, v: VariationSettings[K]) =>
+    setBrand((b) => ({
+      ...b,
+      variationSettings: {
+        ...(b.variationSettings || {
+          intensity: "balanced",
+          allowedPerspectives: ["hero-facade", "twilight-glow", "aerial-overview", "terrace-sanctuary", "macro-reflection"],
+          preferredTranscriptStyles: ["cinematic", "investment", "lifestyle", "launch"],
+          autoDiversifyAspects: true,
+          diversityThreshold: 85,
+        }),
+        [k]: v,
+      },
+    }));
+
   const toggleTone = (t: string) =>
     set("tones", brand.tones.includes(t) ? brand.tones.filter((x) => x !== t) : [...brand.tones, t]);
+
+  const togglePerspective = (p: VisualPerspective) => {
+    const current = brand.variationSettings?.allowedPerspectives ?? [
+      "hero-facade",
+      "twilight-glow",
+      "aerial-overview",
+      "terrace-sanctuary",
+      "macro-reflection",
+    ];
+    const next = current.includes(p)
+      ? current.length > 1
+        ? current.filter((x) => x !== p)
+        : current
+      : [...current, p];
+    setVariation("allowedPerspectives", next);
+  };
+
+  const toggleTranscriptStyle = (s: TranscriptStyle) => {
+    const current = brand.variationSettings?.preferredTranscriptStyles ?? [
+      "cinematic",
+      "investment",
+      "lifestyle",
+      "launch",
+    ];
+    const next = current.includes(s)
+      ? current.length > 1
+        ? current.filter((x) => x !== s)
+        : current
+      : [...current, s];
+    setVariation("preferredTranscriptStyles", next);
+  };
 
   const setFontSize = (section: AdTextSection, value: number) =>
     set("typographyDefaults", {
@@ -159,13 +215,137 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
             </div>
           </div>
 
+          {/* Campaign Variation & Positive Diversity Engine */}
           <div className="mt-8 border-t border-line pt-6">
-            <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.26em] text-mute">
-              <ShieldCheck size={13} className="text-gold" /> Quality gates
+            <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.26em] text-gold font-semibold">
+              <Sparkles size={13} className="text-gold" /> Campaign Variation &amp; Diversity Engine
             </div>
             <p className="mb-5 text-[12px] leading-relaxed text-faint">
-              These thresholds are internal review gates — configurable by you, not an objective
-              measure of advertising effectiveness.
+              Control prompt generation diversity, visual camera vantage points, and video voiceover transcript styles to ensure advertising outputs are fresh, distinct, and never cloned.
+            </p>
+
+            {/* Variation Intensity */}
+            <div className="mb-6 rounded-xl border border-line bg-coal/60 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[12px] font-medium text-cream/90">Variation Intensity</span>
+                <span className="font-mono text-[10.5px] uppercase tracking-wider text-gold font-semibold">
+                  {brand.variationSettings?.intensity ?? "balanced"}
+                </span>
+              </div>
+              <p className="mb-3 text-[11px] text-faint leading-relaxed">
+                Determines how boldly AI explores different architectural angles, lighting conditions, and narrative hooks between campaigns.
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {(["subtle", "balanced", "dynamic"] as VariationIntensity[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setVariation("intensity", mode)}
+                    className={cx(
+                      "rounded-lg border px-3 py-2 text-center text-[12px] capitalize font-medium transition-all",
+                      (brand.variationSettings?.intensity ?? "balanced") === mode
+                        ? "border-gold/70 bg-gold/15 text-gold shadow-sm"
+                        : "border-line bg-panel2/50 text-mute hover:border-gold/40 hover:text-cream"
+                    )}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Allowed Visual Perspectives */}
+            <div className="mb-6 rounded-xl border border-line bg-coal/60 p-4">
+              <div className="mb-1 flex items-center gap-1.5 text-[12px] font-medium text-cream/90">
+                <Eye size={13} className="text-gold" /> Allowed Visual Perspectives &amp; Vantage Points
+              </div>
+              <p className="mb-3 text-[11px] text-faint leading-relaxed">
+                Select camera angles that the AI pipeline can automatically assign across aspect ratios:
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {VISUAL_PERSPECTIVE_OPTIONS.map((opt) => {
+                  const active = (brand.variationSettings?.allowedPerspectives ?? []).includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => togglePerspective(opt.id)}
+                      className={cx(
+                        "rounded-lg border p-2.5 text-left transition-all text-xs",
+                        active
+                          ? "border-gold/60 bg-gold/10 text-cream ring-1 ring-gold/30"
+                          : "border-line bg-panel2/40 text-faint hover:text-mute"
+                      )}
+                    >
+                      <div className="flex items-center justify-between font-medium text-[11.5px]">
+                        <span>{opt.label}</span>
+                        {active && <Check size={12} className="text-gold" />}
+                      </div>
+                      <div className="mt-1 text-[10.5px] leading-snug text-faint">{opt.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Preferred Transcript & Script Styles */}
+            <div className="mb-6 rounded-xl border border-line bg-coal/60 p-4">
+              <div className="mb-1 flex items-center gap-1.5 text-[12px] font-medium text-cream/90">
+                <Film size={13} className="text-gold" /> Preferred Transcript &amp; Script Styles
+              </div>
+              <p className="mb-3 text-[11px] text-faint leading-relaxed">
+                Choose the narrative voiceover modes used for reel storyboards, hooks, and video transcripts:
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {TRANSCRIPT_STYLE_OPTIONS.map((opt) => {
+                  const active = (brand.variationSettings?.preferredTranscriptStyles ?? []).includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => toggleTranscriptStyle(opt.id)}
+                      className={cx(
+                        "rounded-lg border p-2.5 text-left transition-all text-xs",
+                        active
+                          ? "border-gold/60 bg-gold/10 text-cream ring-1 ring-gold/30"
+                          : "border-line bg-panel2/40 text-faint hover:text-mute"
+                      )}
+                    >
+                      <div className="flex items-center justify-between font-medium text-[11.5px]">
+                        <span>{opt.label}</span>
+                        {active && <Check size={12} className="text-gold" />}
+                      </div>
+                      <div className="mt-1 text-[10.5px] leading-snug text-faint">{opt.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Aspect Ratio Auto-Diversification */}
+            <div className="rounded-xl border border-line bg-coal/60 p-4 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[12px] font-medium text-cream/90">Auto-Diversify Across Aspect Ratios</div>
+                <div className="text-[11px] text-faint leading-relaxed mt-0.5">
+                  Assign a different camera perspective per format. When off, keep one visual direction across formats while adapting each crop.
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={brand.variationSettings?.autoDiversifyAspects ?? true}
+                onChange={(e) => setVariation("autoDiversifyAspects", e.target.checked)}
+                className="h-4.5 w-4.5 rounded border-line accent-[var(--gold)] cursor-pointer"
+                aria-label="Auto-diversify across aspect ratios"
+              />
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-line pt-6">
+            <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.26em] text-mute">
+              <ShieldCheck size={13} className="text-gold" /> Quality gates &amp; Diversity checks
+            </div>
+            <p className="mb-5 text-[12px] leading-relaxed text-faint">
+              These thresholds are internal review gates — configurable by you to enforce brand consistency and diversity standards.
             </p>
             <div className="space-y-6">
               <div>
@@ -175,7 +355,7 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
                 </div>
                 <input type="range" min={88} max={99} value={brand.thresholds.ready} onChange={(e) => {
                   const v = Number(e.target.value);
-                  set("thresholds", { ready: v, review: Math.min(brand.thresholds.review, v - 1) });
+                  set("thresholds", { ...brand.thresholds, ready: v, review: Math.min(brand.thresholds.review, v - 1) });
                 }} className="w-full" />
               </div>
               <div>
@@ -185,8 +365,30 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
                 </div>
                 <input type="range" min={60} max={94} value={brand.thresholds.review} onChange={(e) => {
                   const v = Number(e.target.value);
-                  set("thresholds", { ready: Math.max(brand.thresholds.ready, v + 1), review: v });
+                  set("thresholds", { ...brand.thresholds, ready: Math.max(brand.thresholds.ready, v + 1), review: v });
                 }} className="w-full" />
+              </div>
+              {/* Diversity & Freshness QC Threshold */}
+              <div className="pt-2 border-t border-line/60">
+                <div className="mb-2 flex justify-between text-[12px]">
+                  <span className="text-cream/85">Diversity &amp; Freshness Gate — minimum score</span>
+                  <span className="font-mono text-gold">≥ {brand.variationSettings?.diversityThreshold ?? 85}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={70}
+                  max={98}
+                  value={brand.variationSettings?.diversityThreshold ?? 85}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setVariation("diversityThreshold", v);
+                    set("thresholds", { ...brand.thresholds, diversity: v });
+                  }}
+                  className="w-full accent-[var(--gold)]"
+                />
+                <div className="mt-2 text-[10.5px] text-faint leading-relaxed">
+                  Enforces 3 dedicated quality gates: Visual Perspective Diversity, Narrative Transcript Freshness, and Aspect-Ratio Composition Tailoring.
+                </div>
               </div>
             </div>
           </div>
@@ -217,11 +419,12 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
             </div>
           </div>
           <div className="panel p-5">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-mute">Gate behaviour</div>
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-mute">Gate &amp; Diversity behaviour</div>
             <div className="space-y-2 text-[12px]">
-              <div className="flex justify-between"><span className="text-mute">Score 96, all checks pass</span><span className="font-mono text-sage">→ Ready to Post</span></div>
-              <div className="flex justify-between"><span className="text-mute">Score 90, minor contrast flag</span><span className="font-mono text-warn">→ Needs Review</span></div>
-              <div className="flex justify-between"><span className="text-mute">Below floor</span><span className="font-mono text-rust">→ Auto-Improve</span></div>
+              <div className="flex justify-between"><span className="text-mute">Score ≥ {brand.thresholds.ready}, all pass</span><span className="font-mono text-sage">→ Ready to Post</span></div>
+              <div className="flex justify-between"><span className="text-mute">Score {brand.thresholds.review}–{brand.thresholds.ready - 1}</span><span className="font-mono text-warn">→ Needs Review</span></div>
+              <div className="flex justify-between"><span className="text-mute">Diversity below {brand.variationSettings?.diversityThreshold ?? 85}%</span><span className="font-mono text-gold">→ Flagged for Variety</span></div>
+              <div className="flex justify-between"><span className="text-mute">Score &lt; {brand.thresholds.review}</span><span className="font-mono text-rust">→ Auto-Improve</span></div>
             </div>
           </div>
         </div>

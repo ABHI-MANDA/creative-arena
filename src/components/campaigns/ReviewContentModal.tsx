@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowRight, Check, Loader2, Palette, Sparkles, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowRight, Check, Film, Layers, Loader2, Palette, Shuffle, Sparkles, X } from "lucide-react";
 import type { ApprovedAdContent, Direction } from "@/lib/creative/engine";
+import { TRANSCRIPT_STYLE_OPTIONS, type TranscriptStyle } from "@/lib/creative/presets";
 import { cx } from "@/lib/utils";
+
+function createVariationSeed(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function ReviewContentModal({
   campaignId,
@@ -24,46 +31,95 @@ export function ReviewContentModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [activeDirectionId, setActiveDirectionId] = useState(directionId || directions?.[0]?.id);
+  const [directionChoice, setDirectionChoice] = useState({
+    source: directionId,
+    selected: directionId ?? directions?.[0]?.id,
+  });
+  const activeDirectionId = directionChoice.source === directionId
+    ? directionChoice.selected ?? directions?.[0]?.id
+    : directionId ?? directions?.[0]?.id;
+  const [activeStyle, setActiveStyle] = useState<TranscriptStyle>();
+  const [availableStyles, setAvailableStyles] = useState<TranscriptStyle[]>([]);
+  const [autoDiversifyAspects, setAutoDiversifyAspects] = useState(true);
   const [contentDraft, setContentDraft] = useState<ApprovedAdContent | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const variationSeedRef = useRef<string | undefined>(undefined);
+  const requestIdRef = useRef(0);
 
-  useEffect(() => {
-    if (directionId) {
-      setActiveDirectionId(directionId);
-    } else if (directions?.length && !activeDirectionId) {
-      setActiveDirectionId(directions[0].id);
-    }
-  }, [directionId, directions]);
-
-  const loadContent = async (targetDirId?: string) => {
-    const dirIdToUse = targetDirId ?? activeDirectionId ?? directionId ?? directions?.[0]?.id;
+  const loadContent = useCallback(async (
+    targetDirId?: string,
+    targetStyle?: TranscriptStyle,
+    targetSeed?: string
+  ) => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError("");
     try {
       const res = await fetch(`/api/campaigns/${campaignId}/prepare-content`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ directionId: dirIdToUse }),
+        body: JSON.stringify({
+          directionId: targetDirId,
+          variationStyle: targetStyle,
+          variationSeed: targetSeed ?? variationSeedRef.current,
+        }),
       });
-      const data = (await res.json()) as { ok?: boolean; content?: ApprovedAdContent; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        content?: ApprovedAdContent;
+        error?: string;
+        variationSeed?: string;
+        variationStyles?: TranscriptStyle[];
+        autoDiversifyAspects?: boolean;
+      };
       if (!res.ok || !data.content) throw new Error(data.error ?? "Failed to prepare ad content");
+      if (requestId !== requestIdRef.current) return;
       setContentDraft(data.content);
+      variationSeedRef.current = data.variationSeed ?? data.content.variationSeed;
+      setActiveStyle(data.content.variationStyle as TranscriptStyle);
+      setAvailableStyles(data.variationStyles ?? TRANSCRIPT_STYLE_OPTIONS.map((style) => style.id));
+      setAutoDiversifyAspects(data.autoDiversifyAspects !== false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load content for review");
+      if (requestId === requestIdRef.current) {
+        setError(e instanceof Error ? e.message : "Failed to load content for review");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
+  }, [campaignId]);
+
+  const switchVariationStyle = (newStyle: TranscriptStyle) => {
+    setActiveStyle(newStyle);
+    void loadContent(activeDirectionId ?? directionId ?? directions?.[0]?.id, newStyle);
+  };
+
+  const shuffleVariation = () => {
+    const candidateStyles = availableStyles.filter((style) => style !== activeStyle);
+    const randomStyle = candidateStyles[Math.floor(Math.random() * candidateStyles.length)] ?? activeStyle;
+    const variationSeed = createVariationSeed();
+    variationSeedRef.current = variationSeed;
+    if (randomStyle) setActiveStyle(randomStyle);
+    void loadContent(
+      activeDirectionId ?? directionId ?? directions?.[0]?.id,
+      randomStyle,
+      variationSeed
+    );
   };
 
   useEffect(() => {
-    if (isOpen) {
-      const initialDirId = activeDirectionId || directionId || directions?.[0]?.id;
-      loadContent(initialDirId);
+    if (!isOpen) {
+      requestIdRef.current++;
+      variationSeedRef.current = undefined;
+      return;
     }
-  }, [isOpen, campaignId]);
+    variationSeedRef.current = undefined;
+    const timer = setTimeout(() => {
+      void loadContent(directionId ?? directions?.[0]?.id);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [isOpen, campaignId, directionId, directions, loadContent]);
 
   const handleApproveAndGenerate = async () => {
     if (!contentDraft) return;
@@ -134,8 +190,8 @@ export function ReviewContentModal({
                           key={d.id}
                           type="button"
                           onClick={() => {
-                            setActiveDirectionId(d.id);
-                            loadContent(d.id);
+                            setDirectionChoice({ source: directionId, selected: d.id });
+                            void loadContent(d.id, activeStyle, variationSeedRef.current);
                           }}
                           className={cx(
                             "rounded-lg p-2.5 text-left border transition-all text-xs",
@@ -152,6 +208,48 @@ export function ReviewContentModal({
                     </div>
                   </div>
                 )}
+
+                {/* Positive Variation & Automated Style Controls */}
+                <div className="rounded-xl border border-line/80 bg-panel/70 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-gold font-semibold">
+                      <Sparkles size={12} className="text-gold" /> Auto-Variation &amp; Script Style
+                    </span>
+                    <button
+                      type="button"
+                      onClick={shuffleVariation}
+                      disabled={loading}
+                      className="flex items-center gap-1.5 rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11px] font-medium text-gold transition-all hover:bg-gold/20"
+                    >
+                      <Shuffle size={12} /> Shuffle Variations
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {TRANSCRIPT_STYLE_OPTIONS.filter((style) => availableStyles.includes(style.id)).map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => switchVariationStyle(v.id)}
+                        disabled={loading}
+                        className={cx(
+                          "rounded-lg p-2 text-left border transition-all text-xs",
+                          activeStyle === v.id
+                            ? "border-gold bg-gold/15 text-cream ring-1 ring-gold/40 shadow-sm"
+                            : "border-line bg-coal/70 text-mute hover:border-gold/40 hover:text-cream"
+                        )}
+                      >
+                        <div className="font-semibold text-[11px] truncate">{v.label}</div>
+                        <div className="text-[9.5px] text-faint line-clamp-1 mt-0.5">{v.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between text-[10.5px] text-faint pt-1 border-t border-line/50">
+                    <span className="flex items-center gap-1.5 text-sage">
+                      <Check size={11} /> {autoDiversifyAspects ? "Per-format visual variation active" : "One visual direction across formats"}
+                    </span>
+                    <span>Auto-selected from Brand Kit</span>
+                  </div>
+                </div>
 
                 <div className="rounded-xl border border-line/70 bg-panel/50 p-4.5 space-y-3.5">
                   <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-gold font-semibold">
@@ -257,6 +355,9 @@ export function ReviewContentModal({
                     <span>AI Image Generation Prompt</span>
                     <span className="text-faint text-[9px]">Agnes AI / FLUX</span>
                   </div>
+                  <p className="text-[10.5px] leading-relaxed text-faint">
+                    This editable base prompt is combined with 12 seeded concepts, including neutral illustrative residential interiors, and distinct treatments for each ad.
+                  </p>
                   <textarea
                     rows={3}
                     className="input w-full font-mono text-[11.5px] leading-relaxed resize-y"
@@ -264,6 +365,21 @@ export function ReviewContentModal({
                     onChange={(e) => setContentDraft({ ...contentDraft, imagePrompt: e.target.value })}
                     placeholder="Describe architectural facade, swimming pool, lighting..."
                   />
+                </div>
+
+                {/* Video Reel Transcript Voiceover */}
+                <div className="rounded-xl border border-line/70 bg-panel/50 p-4 space-y-2">
+                  <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-gold font-semibold">
+                    <span className="flex items-center gap-1.5"><Film size={12} /> Video Reel Transcript Voiceover</span>
+                    <span className="text-faint text-[9.5px] capitalize">{activeStyle} narration</span>
+                  </div>
+                  <div className="rounded-lg border border-line/60 bg-coal/70 p-3 text-[11.5px] text-cream/90 italic leading-relaxed">
+                    “{contentDraft.tagline}. Rising over {property.location} — {contentDraft.project}. Crafted for distinguished living. {contentDraft.cta} — reserve your private walkthrough.”
+                  </div>
+                  <div className="text-[10px] text-faint flex items-center justify-between">
+                    <span>Generated from active narrative style</span>
+                    <span className="text-gold">15s / 30s Reel Storyboard Ready</span>
+                  </div>
                 </div>
               </div>
 
@@ -383,7 +499,7 @@ export function ReviewContentModal({
         {/* Footer */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/70 bg-panel2/60 px-6 py-4">
           <button
-            onClick={() => loadContent()}
+            onClick={shuffleVariation}
             disabled={loading || submitting}
             className="btn-ghost rounded-xl px-4 py-2.5 text-[12px] text-cream/90 border border-line hover:border-gold/50"
           >
