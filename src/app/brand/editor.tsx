@@ -327,7 +327,7 @@ export function BrandEditor({ initial }: { initial: BrandSettings }) {
               <div>
                 <div className="text-[12px] font-medium text-cream/90">Auto-Diversify Across Aspect Ratios</div>
                 <div className="text-[11px] text-faint leading-relaxed mt-0.5">
-                  Automatically assign unique camera perspectives for 9:16 vertical, 1:1 square, 16:9 widescreen, and 4:5 portrait to prevent repetitive images.
+                  Assign a different camera perspective per format. When off, keep one visual direction across formats while adapting each crop.
                 </div>
               </div>
               <input

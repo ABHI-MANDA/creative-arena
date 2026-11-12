@@ -123,19 +123,26 @@ flowchart TD
 - Upgraded property onboarding and Creative DNA analysis to extract specific architectural styles, facade geometry, fenestration, building materials, and landscaping.
 - Eliminates generic building outputs by anchoring visual generation directly to the project's actual architectural signature.
 
-### 6. Ad-Scrim Controls & Typographic Model Kit
+### 6. Campaign Variation & Diversity Engine
+- **Fresh image prompts per generation**: Aspect-aware framing plus a new variation seed changes the selected camera perspective and photographic moment while preserving the property's verified architecture.
+- **Fresh transcript styles**: The selected style controls 15s / 30s voiceover scripts; the Brand Kit can enable styles for automatic selection or manual review.
+- **Brand Kit Variation Controls**: New controls in `/brand` — variation intensity, allowed visual vantage points, preferred transcript styles, auto-diversify across aspect ratios, and a diversity freshness gate slider.
+- **1-Click Style Shuffle in Review Modal**: Enabled style buttons and Shuffle auto-regenerate copy and prompts without manual typing.
+- **14-Point QC with Diversity Gate**: 3 diversity-specific checks with a configurable 70–98% freshness threshold.
+
+### 7. Ad-Scrim Controls & Typographic Model Kit
 - **Ad-Scrim Slider Controls**: Control gradient opacity and color tone directly in the editor to balance visual punch and copy readability.
 - **Line-by-Line Typographic Presets**: Fine-tune font size, letter spacing, and contrast separately for every copy layer.
 
-### 7. Removal of Dummy Phone Numbers & Defaulting to "BOOK NOW"
+### 8. Removal of Dummy Phone Numbers & Defaulting to "BOOK NOW"
 - **Zero Dummy Numbers**: Eradicated all hardcoded `Call to : 1234567890` fallbacks across visual templates, DOM exporters, and canvas adapters.
 - **Clean Action CTA**: All buttons and call bars default to **`"BOOK NOW"`** or user-approved custom action copy.
 
-### 8. Removal of Aero Signs, Studio Watermarks & Series Names
+### 9. Removal of Aero Signs, Studio Watermarks & Series Names
 - Eliminated aero signs (`↗`), `"ma-arena.studio"` text, and series label watermarks from all visual deliverables.
 - Creatives are 100% clean, pristine, and ready for commercial posting.
 
-### 9. Agnes AI Integration for Content Writing & Architectural Imagery
+### 10. Agnes AI Integration for Content Writing & Architectural Imagery
 - **Agnes AI Content Writing (`agnes-3.0-flash`)**: SOTA ultra-fast creative copywriting, positioning headlines, narrative hooks, and negative-space-aware photographic prompt engineering.
 - **Agnes AI Image Engine (`agnes-image-2.1-flash`)**: High-resolution photorealistic architectural and luxury real-estate image engine.
 

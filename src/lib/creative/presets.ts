@@ -257,13 +257,23 @@ export function mergeBrandSettings(value: Partial<BrandSettings> = {}): BrandSet
   }
 
   const rawVar = value.variationSettings;
+  const allowedPerspectives = Array.isArray(rawVar?.allowedPerspectives)
+    ? rawVar.allowedPerspectives.filter((p): p is VisualPerspective =>
+        VISUAL_PERSPECTIVE_OPTIONS.some((opt) => opt.id === p)
+      )
+    : [];
+  const preferredTranscriptStyles = Array.isArray(rawVar?.preferredTranscriptStyles)
+    ? rawVar.preferredTranscriptStyles.filter((s): s is TranscriptStyle =>
+        TRANSCRIPT_STYLE_OPTIONS.some((opt) => opt.id === s)
+      )
+    : [];
   const variationSettings: VariationSettings = {
     intensity: rawVar?.intensity === "subtle" || rawVar?.intensity === "dynamic" ? rawVar.intensity : "balanced",
-    allowedPerspectives: Array.isArray(rawVar?.allowedPerspectives) && rawVar.allowedPerspectives.length > 0
-      ? rawVar.allowedPerspectives.filter((p): p is VisualPerspective => VISUAL_PERSPECTIVE_OPTIONS.some((opt) => opt.id === p))
+    allowedPerspectives: allowedPerspectives.length > 0
+      ? allowedPerspectives
       : DEFAULT_VARIATION_SETTINGS.allowedPerspectives,
-    preferredTranscriptStyles: Array.isArray(rawVar?.preferredTranscriptStyles) && rawVar.preferredTranscriptStyles.length > 0
-      ? rawVar.preferredTranscriptStyles.filter((s): s is TranscriptStyle => TRANSCRIPT_STYLE_OPTIONS.some((opt) => opt.id === s))
+    preferredTranscriptStyles: preferredTranscriptStyles.length > 0
+      ? preferredTranscriptStyles
       : DEFAULT_VARIATION_SETTINGS.preferredTranscriptStyles,
     autoDiversifyAspects: typeof rawVar?.autoDiversifyAspects === "boolean" ? rawVar.autoDiversifyAspects : true,
     diversityThreshold: typeof rawVar?.diversityThreshold === "number"

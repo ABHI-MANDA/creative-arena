@@ -210,7 +210,32 @@ npm audit --omit=dev
 
 ---
 
-## 9. Vulnerability Reporting Protocol
+## 9. Variation Engine Privacy & AI Pipeline Controls (v1.7.0)
+
+The Campaign Variation & Diversity Engine introduces AI-assisted prompt diversification. The following privacy and security controls apply:
+
+### 9.1 Prompt Isolation
+- Each campaign's image-generation prompt is scoped to that campaign's `id` via deterministic hashing. No campaign can inherit or leak another campaign's visual directive.
+- User-approved prompts are stored server-side only in `app_settings` keyed by `campaign-draft-content:{id}` and are never exposed to client-side storage.
+
+### 9.2 LLM Input Sanitization
+- The `tryLLMOverride` and `writeImagePrompts` functions only inject **verified, server-side property facts** (from the database row) into the LLM prompt. User-supplied free-text fields (`description`, `amenities`) are sliced to a safe maximum length before injection.
+- The LLM system prompt explicitly instructs the model: "Never invent approvals, amenities, distances, returns, scarcity, pricing, completion dates, or guarantees." This prevents hallucinated claims in regulated real estate advertising.
+
+### 9.3 Image Output Filtering
+- Negative-prompt guardrails in `KIND_PHOTOGRAPHY` and `aspectComposition` instruct image models to never render text, logos, prices, or watermarks, ensuring clean outputs safe for further brand overlay.
+- The image proxy at `/api/proxy-image` sanitizes all external image headers before forwarding to the client.
+
+### 9.4 Brand Settings Persistence
+- `VariationSettings` (intensity, perspective allowlist, transcript style preferences, diversity threshold) are stored as a JSONB column in the brand settings table. `mergeBrandSettings` safely deserializes with field-level validation and sane defaults — malformed JSON never corrupts the application state.
+- Diversity threshold is bounded server-side to the range 70–98% regardless of what the client submits.
+
+### 9.5 No PII in AI Calls
+- The LLM and image-generation API calls transmit only: property name, location, type, price, description, confirmed amenities, and campaign objective. No user identity, session tokens, or personal data are ever included in AI provider payloads.
+
+---
+
+## 10. Vulnerability Reporting Protocol
 
 If you discover a potential security vulnerability within CREATIVE-ARENA, please submit a responsible disclosure report:
 

@@ -660,7 +660,7 @@ function CampaignWizard() {
                   <span className="text-faint text-[9.5px]">Photographic Brief</span>
                 </div>
                 <p className="text-[11.5px] text-faint">
-                  Edit the visual direction. The image prompt is adapted to your company, campaign preset, verified property details, and each selected aspect ratio. Text and the white CTA ribbon are added separately.
+                  Review or edit the base direction. Twelve seeded concepts include residential interiors; some ads receive an interior view with distinct framing and lighting. Unspecified interiors stay neutral and illustrative, not claims about exact finishes. Text and the white CTA ribbon are added separately.
                 </p>
                 <textarea
                   rows={5}

@@ -23,6 +23,7 @@ import {
   type CreativeDesignStyle,
   type ScrimSettings,
 } from "./style-config";
+import { selectImagePromptVariation } from "./image-prompt-writer";
 export type { AdFontColors, AdFontSizes, AdTextSection } from "./presets";
 
 export type Brief = {
@@ -726,7 +727,8 @@ export async function tryLLMOverride(
   selectedDirection?: Direction,
   brandSettings?: Pick<BrandSettings, "name" | "color" | "tones">,
   variationSettings?: VariationSettings,
-  variationStyle?: string
+  variationStyle?: string,
+  variationSeed?: string
 ): Promise<{ override: CopyOverride | null; model: string; fallback: boolean }> {
   const agnesKey = process.env.AGNES_API_KEY?.trim();
   const openrouterKey = process.env.OPENROUTER_API_KEY?.trim();
@@ -750,7 +752,11 @@ export async function tryLLMOverride(
 
   const intensity = variationSettings?.intensity ?? "balanced";
   const temperature = intensity === "dynamic" ? 0.8 : intensity === "subtle" ? 0.45 : 0.68;
-  const activeStyle = variationStyle || variationSettings?.preferredTranscriptStyles?.[0] || "cinematic";
+  const availableStyles = variationSettings?.preferredTranscriptStyles ?? [];
+  const activeStyle = variationStyle ||
+    availableStyles[hx(variationSeed || brief.name) % Math.max(availableStyles.length, 1)] ||
+    "cinematic";
+  const imagePromptVariation = selectImagePromptVariation(variationSeed || brief.name);
 
   for (const model of candidateModels) {
     const isAgnesModel = model.toLowerCase().startsWith("agnes-");
@@ -788,8 +794,8 @@ export async function tryLLMOverride(
                 "Return keys: heroHeadline, heroSubline, lifestyleLine, featureHeadline, imagePrompt, captions, hashtags, storyboard.",
                 "captions is an object with optional instagram, facebook, linkedin, whatsapp, portal, youtube strings.",
                 "hashtags is an array of up to 12 strings.",
-                "NARRATIVE SCRIPT & TRANSCRIPT VOICE: In 'storyboard' (5 to 8 shots, 15s for Instagram Reels or 30s for YouTube Shorts), each shot's 'line' must form an authentic, evocative voiceover transcript reflecting the requested style (" + activeStyle + "). Never produce robotic label text like 'hook -> reveal -> CTA'; write polished, conversational, engaging narration that flows seamlessly across the video shots.",
-                "ARCHITECTURAL PERSPECTIVE VARIATION: 'imagePrompt' must specifically capture the project's unique architectural identity, facade materials, structural styling, and spatial character based on the property description and property type. Vary the camera vantage point and atmospheric mood (e.g. dramatic low-angle elevation, twilight glow with interior warm illumination, or landscaped aerial vista). Anchor structures in the lower-middle frame, maintaining clean open sky negative space in upper 35-40% for typography overlays. Do not render text, logos, prices, or typography.",
+                "NARRATIVE SCRIPT & TRANSCRIPT VOICE: In 'storyboard' (5 to 8 shots, 15s for Instagram Reels or 30s for YouTube Shorts), each shot's 'line' must form an authentic, evocative voiceover transcript reflecting the requested style (" + activeStyle + "). Treat the variation seed as a prompt to vary hooks, transitions, phrasing, and sentence rhythm between generations; do not reuse a fixed script formula. Never produce robotic label text like 'hook -> reveal -> CTA'; write polished, conversational, engaging narration that flows seamlessly across the video shots.",
+                "IMAGE PROMPT VARIATION: Use the selected image-prompt variation supplied in the user data as the defining photographic concept for 'imagePrompt'. Keep the property facts and architecture accurate; do not replace the selected concept with a generic hero shot or invent amenities. Preserve clean negative space for ad copy and never render text, logos, prices, or typography.",
                 templateInstructions ? `Active template direction (follow unless it conflicts with verified facts): ${templateInstructions}` : "",
               ].filter(Boolean).join(" "),
             },
@@ -820,6 +826,8 @@ export async function tryLLMOverride(
                   intensity,
                   narrativeStyle: activeStyle,
                   allowedPerspectives: variationSettings?.allowedPerspectives,
+                  variationSeed,
+                  selectedImagePromptVariation: imagePromptVariation,
                 },
                 selectedCreativeDirection: selectedDirection ? {
                   name: selectedDirection.name,
@@ -1088,11 +1096,19 @@ export function qualityCheck(
   );
   const diversityPass = diversityChecks.filter((c) => c.pass).length;
   const diversityScore = Math.round(80 + (diversityPass / Math.max(1, diversityChecks.length)) * 19);
+  const diversityGatePass = diversityScore >= (thresholds.diversity ?? 85);
+  if (!diversityGatePass) {
+    const failedGate = diversityChecks.find((check) => check.pass);
+    if (failedGate) failedGate.pass = false;
+  }
+  const gatedScore = !diversityGatePass && score >= thresholds.ready
+    ? thresholds.ready - 1
+    : score;
 
   return {
-    score,
+    score: gatedScore,
     checks,
-    status: score >= thresholds.ready ? "ready" : score >= thresholds.review ? "review" : "improving",
+    status: gatedScore >= thresholds.ready ? "ready" : gatedScore >= thresholds.review ? "review" : "improving",
     diversityScore,
   };
 }
@@ -1123,6 +1139,7 @@ export type ApprovedAdContent = {
   };
   hashtags?: string[];
   variationStyle?: string;
+  variationSeed?: string;
 };
 
 export function parseBhk(propertyType?: string, text?: string): string {
@@ -1166,14 +1183,18 @@ export function buildDraftAdContent(
   brandName?: string,
   presetId = "luxury-property",
   variationSettings?: VariationSettings,
-  variationStyle?: string
+  variationStyle?: string,
+  variationSeed?: string
 ): ApprovedAdContent {
   const devAndProj = {
     developer: (brandName?.trim() || brief.name.split(" ")[0] || "EXCLUSIVE").toUpperCase(),
     project: brief.name.toUpperCase(),
   };
   const bhk = parseBhk(brief.propertyType, brief.description);
-  const selectedStyle = variationStyle || variationSettings?.preferredTranscriptStyles?.[0] || "cinematic";
+  const availableStyles = variationSettings?.preferredTranscriptStyles ?? [];
+  const selectedStyle = variationStyle ||
+    availableStyles[hx(variationSeed || brief.name) % Math.max(availableStyles.length, 1)] ||
+    "cinematic";
 
   const presetCtas: Record<string, string> = {
     "luxury-property": "Explore Residences",
@@ -1234,17 +1255,20 @@ export function buildDraftAdContent(
   const descContext = brief.description ? `Architectural cues: ${brief.description.slice(0, 160)}.` : "";
 
   const stylePromptCues: Record<string, string> = {
-    cinematic: `Captured during warm golden hour sunset with champagne reflections across floor-to-ceiling glass and tranquil infinity water features. Designed in ${archDetail} with sculptural volumetric lines.`,
-    investment: `Confident low-angle architectural portrait emphasizing soaring facade height, sleek vertical louvers, and landmark presence in the surrounding corridor. Designed in ${archDetail}.`,
-    lifestyle: `Ground-level tranquil perspective featuring arrival courtyard, lush biophilic landscaping, and warm interior lighting bounce through double-height windows. Designed in ${archDetail}.`,
-    launch: `Striking twilight dusk facade reveal with dramatic illuminated architectural features, warm interior bounce, and ambient blue-hour sky. Designed in ${archDetail}.`,
+    cinematic: `Warm late-afternoon light, open shadows, and a considered three-quarter view of the verified architecture. Designed in ${archDetail}.`,
+    investment: `Confident architectural framing that emphasizes the property's verified scale, proportions, and setting. Designed in ${archDetail}.`,
+    lifestyle: `Calm, welcoming eye-level perspective grounded in the property's confirmed spaces and features. Designed in ${archDetail}.`,
+    launch: `Striking but realistic twilight facade reveal, preserving the property's verified architecture and proportions. Designed in ${archDetail}.`,
   };
 
   const selectedPromptCue = stylePromptCues[selectedStyle] || stylePromptCues.cinematic;
+  const imagePromptVariation = selectImagePromptVariation(variationSeed || brief.name);
 
-  const imagePrompt =
-    override?.imagePrompt ||
+  const generatedImagePrompt = override?.imagePrompt?.trim() ||
     `Photorealistic architectural photography of ${brief.name}, ${brief.propertyType} in ${brief.location}. ${selectedPromptCue} ${descContext} ${verifiedAmenities}. Building anchored in the lower 60% of the frame with clean, uncluttered open sky in the upper 40% reserved for headline typography. Premium architectural advertising standard, realistic environmental depth, strictly no text, no logos, no watermarks.`;
+  const imagePrompt = generatedImagePrompt.includes(imagePromptVariation)
+    ? generatedImagePrompt
+    : `${generatedImagePrompt} Selected visual concept: ${imagePromptVariation}`;
 
   return {
     developer: devAndProj.developer,
@@ -1261,6 +1285,7 @@ export function buildDraftAdContent(
     captions: override?.captions,
     hashtags: override?.hashtags,
     variationStyle: selectedStyle,
+    variationSeed,
   };
 }
 
@@ -1271,9 +1296,10 @@ export type ComposeInput = {
   platformIds: string[];
   direction: Direction;
   images: Img[];
-  thresholds: { ready: number; review: number };
+  thresholds: { ready: number; review: number; diversity?: number };
   override?: CopyOverride | null;
   approvedContent?: ApprovedAdContent | null;
+  variationStyle?: string;
   typographyDefaults?: BrandSettings["typographyDefaults"];
   variant?: number;
   enabledKinds?: string[];
@@ -1283,7 +1309,8 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
   const { brief, dna, presetId, platformIds, direction, images, thresholds } = input;
   const ac = input.approvedContent ?? null;
   const variant = input.variant ?? 0;
-  const copy = presetCopy(presetId, brief, dna, ac?.variationStyle, variant);
+  const variationStyle = ac?.variationStyle ?? input.variationStyle;
+  const copy = presetCopy(presetId, brief, dna, variationStyle, variant);
   const ov = input.override ?? null;
   const out: NewAsset[] = [];
   const heroLine = ac?.tagline ?? (ov?.heroHeadline ?? copy.hero);
@@ -1417,7 +1444,7 @@ export function composeAssets(input: ComposeInput): NewAsset[] {
         case "reel": {
           const shots = ov?.storyboard?.length
             ? fitStoryboardDuration(ov.storyboard, platform === "yt-short" ? 30 : 15)
-            : storyboardFor(brief, dna, copy, direction, images, platform === "yt-short", ac?.variationStyle || "cinematic");
+            : storyboardFor(brief, dna, copy, direction, images, platform === "yt-short", variationStyle || "cinematic");
           push(platform, kind, {
             ...base,
             headline: heroLine,

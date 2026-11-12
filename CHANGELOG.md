@@ -4,6 +4,64 @@ Notable changes to M & A Creative Arena are recorded here in chronological order
 
 ---
 
+## [1.7.0] - 2026-11-10
+
+### Added — Campaign Variation & Diversity Engine
+
+- **`VariationSettings` Brand Schema Extension (`src/lib/creative/presets.ts`)**:
+  - Added `VariationIntensity` type (`subtle` | `balanced` | `dynamic`) to control how strongly camera and lighting vary between generations.
+  - Added `VisualPerspective` options with 5 curated vantage points: `hero-facade`, `twilight-glow`, `aerial-overview`, `terrace-sanctuary`, `macro-reflection`.
+  - Added `TranscriptStyle` options: `cinematic`, `investment`, `lifestyle`, `launch` — each producing a distinct voiceover voice and narrative rhythm.
+  - Added `VariationSettings` composite type with `intensity`, `allowedPerspectives`, `preferredTranscriptStyles`, `autoDiversifyAspects`, and `diversityThreshold` (default 85%).
+  - Extended `BrandSettings` with `variationSettings`; `mergeBrandSettings` safely deserializes and defaults all new fields without requiring a database schema migration.
+  - Added 3 dedicated diversity QC checks to `QC_CHECKLIST`: `"Visual perspective diversity"`, `"Narrative transcript freshness"`, and `"Aspect-ratio composition tailoring"`.
+
+- **Multi-Angle Image Prompt Diversification (`src/lib/creative/image-prompt-writer.ts`)**:
+  - Added tailored, property-accurate framing guidance for all 8 aspect ratios.
+  - `approvedPromptSet` adds per-generation camera/lighting direction to user-approved prompts and applies aspect-specific framing when automatic per-format variation is enabled.
+  - `userPrompt` includes the configured intensity, allowed perspectives, selected transcript style, variation seed, and per-aspect composition guide.
+  - Variation changes viewpoint, framing, and photographic moment; it does not ask the image model to redesign the verified property.
+
+- **Transcript & Voiceover Variation (`src/lib/creative/engine.ts`)**:
+  - `presetCopy` upgraded with 4 full narrative style banks: `cinematic`, `investment`, `lifestyle`, `launch` — each containing campaign-preset-specific kicker, hero, sub, CTA, and hook variants.
+  - `storyboardFor` now produces fully unique 15s and 30s voiceover transcripts per style: cinematic poetry, investor briefing tone, lifestyle warmth, or launch momentum — replacing the previous single-formula storyboard.
+  - `tryLLMOverride` adopts dynamic LLM temperature: `subtle=0.45`, `balanced=0.68`, `dynamic=0.8`; injects `variationDirectives` and transcript voice rules into every content generation request.
+  - `buildDraftAdContent` generates style-specific taglines and image-prompt atmospheric cues per the active narrative mode.
+  - `qualityCheck` evaluates the 3 diversity-specific checklist items and applies the configurable diversity threshold to QC checks and readiness.
+  - `composeAssets` threads `variationStyle` into `presetCopy` and `storyboardFor`, ensuring consistent narrative voice across all ad formats in a single campaign run.
+
+- **Brand Kit Variation Controls (`src/app/brand/editor.tsx`)**:
+  - New **Campaign Variation & Diversity Engine** section in the Brand Kit editor:
+    - Variation intensity 3-way selector: `Subtle` (safe, on-brand), `Balanced` (default), `Dynamic` (bold, exploratory).
+    - Allowed visual perspective vantage points toggle grid — select which of the 5 camera angles the pipeline can assign automatically.
+    - Preferred transcript & script style toggle grid — restrict or expand narrative voice modes.
+    - Auto-diversify across aspect ratios checkbox (enabled by default).
+  - New **Diversity & Freshness Gate** slider (70%–98%, default 85%) in the Quality Gates section.
+  - Gate-behaviour preview panel shows "Diversity below X% → Flagged for Variety" alongside existing Ready/Review/Auto-Improve rules.
+
+- **QC Panel Diversity Audit (`src/components/quality.tsx`)**:
+  - Added **Diversity & Variation Gate** audit card at the top of the QC panel showing `N/3 Verified` checks and the configured diversity threshold.
+  - Diversity-specific checklist items are tagged with a gold `Variety` badge to visually distinguish them from core brand QC checks.
+
+- **1-Click Variation Controls in Review Modal (`src/components/campaigns/ReviewContentModal.tsx`)**:
+  - **Auto-Variation & Script Style selector bar** with buttons limited to transcript styles enabled in the Brand Kit.
+  - Drafts automatically choose an enabled style and per-generation visual seed; **Shuffle Variations** selects a different enabled style when possible and refreshes the visual seed.
+  - **Video Reel Transcript Voiceover preview card** showing the current narration lines live so users can judge the script tone before approving.
+  - Multi-angle aspect diversification status indicator confirming automated perspective assignment is active.
+
+- **Campaign & API Integration**:
+  - `prepare-content` route: automatically selects an enabled `variationStyle`, accepts an optional variation seed, and returns the available styles to the review UI.
+  - `generate` route: reuses the approved variation seed and Brand Kit settings across copy, image prompts, and QC.
+  - `brand` route: persists `diversity` threshold alongside ready/review thresholds.
+
+### Fixed
+
+- **Repetitive Image Generation Root Cause**: Previously approved prompts received little variation beyond aspect ratio. Prompts now combine aspect-aware framing with Brand Kit-selected perspectives and a fresh per-generation photographic moment, while keeping the property's architecture and facts intact.
+- **Repetitive Transcript Root Cause**: Previously `storyboardFor` was hardcoded to 5 static template strings (`copy.hook`, `${brief.name}, ${brief.location}`, `Explore...`, `amenityList`, `cta`) making every video storyboard identical. Fixed with 4 fully distinct voiceover script banks (short 15s / long 30s each).
+- **TypeScript Errors**: Resolved `TS2322` on `prepareReview` MouseEventHandler mismatch and `TS2353` missing `diversityScore` on `QCResult` interface.
+
+---
+
 ## [1.6.0] - 2026-11-02
 
 ### Added
