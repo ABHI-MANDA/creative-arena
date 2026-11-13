@@ -563,7 +563,6 @@ function populatePosterObjects(
   canvas.add(projText);
   currentTop += calcTextHeight(project, projFs, width * 0.92) + 1.2 * cqw;
 
-  // 4. Tagline & Divider
   const tagFs = scaledFontSize(payload, "tagline", Math.max(10, Math.round(2.3 * cqw)));
   const tagText = new fabric.Textbox(tagline, {
     left: width / 2,
@@ -589,29 +588,6 @@ function populatePosterObjects(
   };
   canvas.add(tagText);
   currentTop += tagFs * 1.2 + 0.4 * cqw;
-
-  // Subtle Divider line
-  const divLineW = 18 * cqw;
-  const divLine = new fabric.Rect({
-    left: width / 2 - divLineW / 2,
-    top: currentTop,
-    width: divLineW,
-    height: 1,
-    fill: "rgba(255, 255, 255, 0.4)",
-    selectable: false,
-  });
-  (divLine as unknown as { meta: ObjectMeta }).meta = {
-    id: "divider-line",
-    name: "Tagline Divider",
-    editable: true,
-    locked: false,
-    deletable: true,
-    visible: true,
-    category: "shape",
-    aiGenerated: true,
-  };
-  canvas.add(divLine);
-  currentTop += 1.6 * cqw;
 
   // 5. BHK Highlight
   const bhkFs = scaledFontSize(payload, "bhk", Math.max(26, Math.round(7.6 * cqw)));

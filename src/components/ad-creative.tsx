@@ -201,7 +201,6 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
           {project}
         </h2>
 
-        {/* Hook / Tagline with subtle divider */}
         {tagline && <div className={cx("mt-[1.4cqw] flex flex-col", minimal ? "items-start" : "items-center")}>
           <p
             className="font-sans font-semibold tracking-[0.16em] text-white/95"
@@ -213,7 +212,6 @@ function PosterBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings
           >
             {tagline}
           </p>
-          <div className="w-[18cqw] h-[1px] bg-white/40 mt-[0.8cqw]" />
         </div>}
 
         {/* Configuration / BHK Highlight */}
@@ -370,7 +368,6 @@ function WideBody({ asset, brand }: { asset: AdAssetLike; brand: BrandSettings }
             >
               {tagline}
             </p>
-            <div className="w-[12cqw] h-[1px] bg-white/40 mt-[0.4cqw]" />
           </div>}
 
           {/* BHK Highlight */}

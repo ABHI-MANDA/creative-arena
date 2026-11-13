@@ -448,12 +448,9 @@ export function ReviewContentModal({
                       <div className="font-sans font-extrabold uppercase tracking-[0.05em] text-white text-[17px] leading-tight mt-0.5 drop-shadow-md">
                         {contentDraft.project || "PROJECT NAME"}
                       </div>
-                      <div className="mt-0.5 flex flex-col items-center">
-                        <p className="font-sans font-semibold tracking-[0.12em] text-white/95 text-[8.5px] drop-shadow">
-                          {contentDraft.tagline || "WHERE LUXURY MEETS NATURE"}
-                        </p>
-                        <div className="w-14 h-[1px] bg-white/40 mt-0.5" />
-                      </div>
+                      <p className="font-sans font-semibold tracking-[0.12em] text-white/95 text-[8.5px] drop-shadow mt-0.5">
+                        {contentDraft.tagline || "WHERE LUXURY MEETS NATURE"}
+                      </p>
                       <div className="font-sans font-black tracking-tight text-white text-[22px] leading-none mt-1.5 drop-shadow-lg">
                         {contentDraft.bhk || "3 & 4 BHK"}
                       </div>
